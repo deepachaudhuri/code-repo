@@ -126,7 +126,8 @@ Add these secrets in GitHub repository settings:
 - `AWS_SECRET_ACCESS_KEY` - IAM user secret key
 - `AWS_REGION` - AWS region (e.g., us-east-1)
 
-## Build & Push Images
+
+## Build & Push Images 
 
 Images are automatically built and pushed on each commit:
 
