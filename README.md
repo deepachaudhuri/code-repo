@@ -1,64 +1,86 @@
-# Code Repository - Application Source Code
+# Application Repository - Multi-Service Microservices
 
-This folder contains the application source code that will be built and pushed to ECR via GitHub Actions.
+This folder contains the application source code for three microservices that will be built and pushed to ECR via GitHub Actions.
 
 ## Structure
 
 ```
-code-repo/
 ├── api/
-│   ├── Dockerfile
-│   ├── main.py
-│   └── requirements.txt
+│   ├── Dockerfile       # Multi-stage Python build
+│   ├── main.py          # Flask REST API
+│   └── requirements.txt  # Dependencies
 ├── web/
-│   ├── Dockerfile
-│   └── index.html
+│   ├── Dockerfile       # Nginx-based static site
+│   ├── index.html       # HTML content
+│   └── nginx.conf       # Configuration
 ├── worker/
-│   ├── Dockerfile
-│   └── worker.py
+│   ├── Dockerfile       # Python worker process
+│   ├── worker.py        # Background jobs
+│   └── requirements.txt  # Dependencies
 └── .github/workflows/
-    └── build-and-push.yml
+    └── build-and-push.yml   # CI/CD pipeline
 ```
 
 ## Services
 
-### API Service (lwplabs-api)
-- Python-based REST API
-- Runs on port 5000
-- Builds and pushes to ECR
+### API Service
+- **Language:** Python (Flask)
+- **Port:** 5000
+- **Purpose:** REST API backend
+- **ECR Name:** `app-api`
 
-### Web Service (lwplabs-web)
-- Static website
-- Runs on port 80
-- Nginx-based
+### Web Service
+- **Language:** Nginx
+- **Port:** 80
+- **Purpose:** Static website / frontend
+- **ECR Name:** `app-web`
 
-### Worker Service (lwplabs-worker)
-- Background job processor
-- Runs scheduled tasks
-- Python-based
+### Worker Service
+- **Language:** Python
+- **Purpose:** Background job processor
+- **ECR Name:** `app-worker`
 
 ## GitHub Actions Workflow
 
 The workflow automatically:
-1. Triggers on push to main branch
-2. Builds Docker images for each service
-3. Pushes images to ECR with tags: `latest` and `git-sha`
-4. Tags images with environment (dev/staging/prod)
+1. **Triggers on:** Push to `dev`, `stg`, or `master` branches
+2. **Builds:** All 3 services in parallel
+3. **Pushes:** Images to ECR with environment-specific tags
+4. **Tags:** Each image with:
+   - `latest` - Most recent build
+   - `branch-name` - Branch-specific (dev, stg, master)
+   - `sha-{commit}` - Commit hash for traceability
+   - `{timestamp}` - Build timestamp
+
+## Branch Strategy
+
+| Branch | Environment | ECR Tag | Purpose |
+|--------|-------------|---------|----------|
+| `dev` | Development | `dev` | Feature development |
+| `stg` | Staging | `stg` | Testing & QA |
+| `master` | Production | `master`, `latest` | Production deployment |
 
 ## Pushing to GitHub
 
 ```bash
 # Initialize git repo
 git init
-git remote add origin https://github.com/YOUR_USERNAME/lwplabs.git
+git remote add origin https://github.com/YOUR_USERNAME/app.git
 
 # Add files
 git add .
 git commit -m "Initial commit: Application source code"
 
-# Push to GitHub
-git branch -M main
-git push -u origin main
+# Create and push to dev branch
+git branch -M dev
+git push -u origin dev
+
+# Create stg and master branches
+git checkout -b stg
+git push -u origin stg
+
+git checkout -b master
+git push -u origin master
 ```
 
 ## Required GitHub Secrets
@@ -70,9 +92,19 @@ Add these secrets in GitHub repository settings:
 
 ## Build & Push Images
 
-Images are automatically built and pushed on each commit to main:
+Images are automatically built and pushed on each commit:
 
 ```
-{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/lwplabs-api:latest
-{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/lwplabs-api:sha-{GIT_SHA}
+Development (dev branch):
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:dev
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:sha-{GIT_SHA}
+
+Staging (stg branch):
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:stg
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:sha-{GIT_SHA}
+
+Production (master branch):
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:master
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:latest
+{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:sha-{GIT_SHA}
 ```

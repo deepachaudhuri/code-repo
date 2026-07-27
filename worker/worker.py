@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LWPlabs Worker Service
+Worker Service
 
 Background job processor for scheduled and async tasks.
 """
@@ -16,7 +16,7 @@ logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO'),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger('lwplabs-worker')
+logger = logging.getLogger('worker')
 
 # Get environment info
 HOSTNAME = socket.gethostname()
@@ -63,7 +63,7 @@ class Worker:
     def log_stats(self):
         """Log worker statistics"""
         uptime = (datetime.utcnow() - self.start_time).total_seconds()
-        logger.info(f"Stats - Tasks: {self.tasks_processed}, Errors: {self.errors}, Uptime: {uptime}s")
+        logger.info(f"Stats - Processed: {self.tasks_processed}, Errors: {self.errors}, Uptime: {uptime}s")
     
     def run(self):
         """Main worker loop"""
@@ -86,12 +86,12 @@ class Worker:
                 time.sleep(1)
         
         except KeyboardInterrupt:
-            logger.info("Worker interrupted by user")
+            logger.info("Worker interrupted")
         except Exception as e:
-            logger.error(f"Worker error: {str(e)}")
+            logger.error(f"Error: {str(e)}")
         finally:
-            logger.info(f"Worker stopped: {WORKER_ID}")
-            logger.info(f"Total tasks: {self.tasks_processed}, Errors: {self.errors}")
+            logger.info(f"Worker shutdown: {WORKER_ID}")
+            logger.info(f"Summary - Processed: {self.tasks_processed}, Errors: {self.errors}")
 
 if __name__ == '__main__':
     worker = Worker()

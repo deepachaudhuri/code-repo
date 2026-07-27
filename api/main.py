@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-LWPlabs API Service
+API Service
 
-Simple Flask API for demonstration purposes.
+Simple Flask REST API for microservices.
 """
 
 from flask import Flask, jsonify
@@ -23,7 +23,7 @@ def health():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'service': 'lwplabs-api',
+        'service': 'api',
         'timestamp': datetime.utcnow().isoformat()
     })
 
@@ -31,7 +31,7 @@ def health():
 def info():
     """Service information endpoint"""
     return jsonify({
-        'service': 'lwplabs-api',
+        'service': 'api',
         'version': VERSION,
         'environment': ENVIRONMENT,
         'hostname': HOSTNAME,
@@ -44,7 +44,7 @@ def status():
     """API status endpoint"""
     return jsonify({
         'status': 'running',
-        'service': 'lwplabs-api',
+        'service': 'api',
         'uptime': 'Check deployment logs',
         'requests_processed': 'N/A'
     })
@@ -53,7 +53,7 @@ def status():
 def root():
     """Root endpoint"""
     return jsonify({
-        'message': 'Welcome to LWPlabs API',
+        'message': 'Welcome to API Service',
         'endpoints': {
             'health': '/health',
             'info': '/api/info',

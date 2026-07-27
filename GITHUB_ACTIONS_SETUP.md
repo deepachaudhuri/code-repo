@@ -1,4 +1,16 @@
-# GitHub Actions Setup Guide
+# GitHub Actions CI/CD Setup Guide
+
+## Branch Strategy
+
+```
+dev    → Development environment
+stg    → Staging environment  
+master → Production environment
+```
+
+Each branch automatically builds and deploys with environment-specific tags.
+
+---
 
 ## Prerequisites
 
@@ -9,27 +21,35 @@
 ## Step 1: Create GitHub Repository
 
 ```bash
-# Navigate to code-repo
-cd code-repo
-
 # Initialize git repository
 git init
 
 # Add GitHub remote
-git remote add origin https://github.com/YOUR_USERNAME/lwplabs.git
-
-# Create main branch
-git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/app.git
 
 # Add all files
 git add .
 
 # Make initial commit
-git commit -m "feat: Initial commit - Application source code with 3 services"
+git commit -m "feat: Initial commit - Multi-service microservices application"
 
-# Push to GitHub
-git push -u origin main
+# Create dev branch (for development)
+git branch -M dev
+git push -u origin dev
+
+# Create stg branch (for staging/testing)
+git checkout -b stg
+git push -u origin stg
+
+# Create master branch (for production)
+git checkout -b master
+git push -u origin master
 ```
+
+**Note:** Typically you would:
+- Develop on `dev` branch
+- Test on `stg` branch
+- Deploy to prod from `master` branch
 
 ## Step 2: Add GitHub Secrets
 
@@ -66,7 +86,8 @@ Create an IAM user with this policy for secure access:
         "ecr:UploadLayerPart",
         "ecr:CompleteLayerUpload",
         "ecr:DescribeRepositories",
-        "ecr:ListImages"
+        "ecr:ListImages",
+        "sts:GetCallerIdentity"
       ],
       "Resource": "*"
     }
@@ -90,11 +111,12 @@ To manually trigger:
 ## Step 4: Monitor Builds
 
 1. Go to **Actions** tab
-2. Click on the workflow run
-3. Monitor build progress for each service:
-   - ✅ api
-   - ✅ web
-   - ✅ worker
+2. Click on workflow run
+3. Monitor build progress:
+   - ✅ setup
+   - ✅ build-and-push (api, web, worker in parallel)
+   - ✅ test-deployment
+   - ✅ notify
 
 ## Step 5: Verify ECR Images
 
@@ -103,15 +125,15 @@ After successful build, images are available in ECR:
 ```bash
 # List images in each repository
 aws ecr describe-images \
-  --repository-name lwplabs-api \
+  --repository-name app-api \
   --region us-east-1
 
 aws ecr describe-images \
-  --repository-name lwplabs-web \
+  --repository-name app-web \
   --region us-east-1
 
 aws ecr describe-images \
-  --repository-name lwplabs-worker \
+  --repository-name app-worker \
   --region us-east-1
 ```
 
@@ -161,28 +183,41 @@ aws ecr describe-repositories --region us-east-1
 ### Image Tags
 
 Each image is tagged with:
-- `latest` - Latest version
-- `<branch-name>` - Branch name (e.g., main, develop)
-- `sha-<commit-sha>` - Commit SHA for traceability
-- `<timestamp>` - Build timestamp for versioning
+- `latest` - Latest stable (from master only)
+- `<branch-name>` - Branch-specific (dev, stg, master)
+- `sha-<commit-sha>` - Commit hash for traceability
+- `<timestamp>` - Build timestamp (YYYYMMDD-HHMMSS)
 
 ### Example Image Names
 
+**Development:**
 ```
-123456789012.dkr.ecr.us-east-1.amazonaws.com/lwplabs-api:latest
-123456789012.dkr.ecr.us-east-1.amazonaws.com/lwplabs-api:main
-123456789012.dkr.ecr.us-east-1.amazonaws.com/lwplabs-api:sha-abc1234
-123456789012.dkr.ecr.us-east-1.amazonaws.com/lwplabs-api:20240127-143022
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:dev
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:sha-abc1234
+```
+
+**Staging:**
+```
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:stg
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:sha-abc1234
+```
+
+**Production:**
+```
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:master
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:latest
+123456789012.dkr.ecr.us-east-1.amazonaws.com/app-api:sha-abc1234
 ```
 
 ## Next Steps
 
-1. ✅ Set up GitHub repository
+1. ✅ Create GitHub repository
 2. ✅ Add AWS credentials to GitHub Secrets
-3. ✅ Push code to trigger workflow
-4. ✅ Verify images in ECR
-5. 📋 Create Kubernetes manifests to deploy to EKS
-6. 📋 Set up deployment pipeline (optional)
+3. ✅ Create branches: dev, stg, master
+4. ✅ Push code to trigger workflow
+5. ✅ Verify images in ECR with environment tags
+6. 📋 Create Kubernetes manifests
+7. 📋 Deploy to EKS cluster
 
 ## Resources
 
