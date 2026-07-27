@@ -217,16 +217,26 @@ app-worker (3 images from last build):
 
 ### 4. Deploy to EKS
 
-**Development Environment (dev branch):**
+**Automated Deployment (via GitHub Actions):**
+
+The `deploy-to-eks.yml` workflow automatically triggers after images are pushed to ECR:
+
+1. Determines environment from branch (dev/stg/master)
+2. Updates kubeconfig and accesses EKS cluster
+3. Verifies images exist in ECR
+4. Applies deployment manifests with correct image tags
+5. Scales replicas based on environment
+6. Waits for pods to be ready
+7. Runs smoke tests
+8. Provides LoadBalancer URLs
+
+**Manual Deployment (if needed):**
+
 ```bash
-kubectl apply -f api-deployment-dev.yaml
-# Uses image: app-api:dev
-
-kubectl apply -f web-deployment-dev.yaml
-# Uses image: app-web:dev
-
-kubectl apply -f worker-deployment-dev.yaml
-# Uses image: app-worker:dev
+# Development Environment (dev branch)
+kubectl apply -f deployments/api-deployment.yaml -n dev
+kubectl apply -f deployments/web-deployment.yaml -n dev
+kubectl apply -f deployments/worker-deployment.yaml -n dev
 
 # Result:
 # - 1 API pod

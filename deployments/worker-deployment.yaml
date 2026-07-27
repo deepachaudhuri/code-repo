@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: default
+  labels:
+    app: worker
+    service: worker
+spec:
+  replicas: 1  # Change to 1 for stg, 2 for prod
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+        service: worker
+    spec:
+      containers:
+      - name: worker
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/app-worker:dev  # Change tag: dev -> stg -> latest
+        
+        # Environment variables
+        env:
+        - name: ENVIRONMENT
+          value: "development"  # Change to staging or production
+        - name: VERSION
+          value: "1.0.0"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        # Resource requests and limits
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        
+        # Liveness probe (check if worker_healthy file exists)
+        livenessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/worker_healthy
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 3
+          failureThreshold: 3
+      
+      # Pod restart policy
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: default
+  labels:
+    app: worker
+spec:
+  type: ClusterIP  # Internal service only
+  ports:
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: metrics
+  selector:
+    app: worker
+  sessionAffinity: None
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75

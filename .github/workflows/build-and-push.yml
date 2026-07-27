@@ -79,18 +79,6 @@ jobs:
           REPO_NAME="${{ env.REGISTRY_PREFIX }}-${{ matrix.service }}"
           echo "name=${REPO_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Create ECR repository if not exists
-        run: |
-          REPO_NAME="${{ steps.repo.outputs.name }}"
-          aws ecr describe-repositories \
-            --repository-names "${REPO_NAME}" \
-            --region ${{ env.AWS_REGION }} || \
-          aws ecr create-repository \
-            --repository-name "${REPO_NAME}" \
-            --region ${{ env.AWS_REGION }} \
-            --image-scanning-configuration scanOnPush=true \
-            --encryption-configuration encryptionType=AES256
-
       - name: Build, tag, and push Docker image to ECR
         uses: docker/build-push-action@v5
         with:
