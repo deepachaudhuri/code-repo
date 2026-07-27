@@ -2,7 +2,43 @@
 
 This folder contains the application source code for three microservices that will be built and pushed to ECR via GitHub Actions.
 
-## Structure
+## Architecture Overview
+
+```
+GitHub (dev/stg/master) 
+    ↓
+GitHub Actions CI/CD
+    ↓
+AWS ECR (Container Registry)
+    ↓
+AWS EKS (Kubernetes Cluster)
+    ↓
+Running Pods (API, Web, Worker)
+```
+
+**See** `AWS_ARCHITECTURE.drawio` for detailed architecture diagram (open with draw.io)
+
+---
+
+## 📚 Documentation
+
+This repository includes comprehensive guides:
+
+| Document | Purpose |
+|----------|---------|
+| **AWS_ARCHITECTURE.drawio** | Visual architecture diagram (open with [draw.io](https://draw.io)) |
+| **ARCHITECTURE_DETAILED.md** | Complete pipeline flow, data flows, security, monitoring |
+| **GITHUB_ACTIONS_SETUP.md** | Step-by-step setup guide with troubleshooting |
+
+**Quick Flow:**
+1. Push code to `dev`, `stg`, or `master` branch
+2. GitHub Actions automatically builds Docker images
+3. Images are scanned for vulnerabilities
+4. Images are pushed to AWS ECR with environment tags
+5. Deploy from ECR to EKS cluster (manual step)
+6. Pods run with your application code
+
+---
 
 ```
 ├── api/

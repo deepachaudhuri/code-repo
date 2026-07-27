@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2024-01-27T12:00:00.000Z" agent="DiagramsNet" etag="abc123" version="21.0" type="device">
+  <diagram name="AWS Architecture" id="aws-architecture">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="AWS Multi-Environment CI/CD Pipeline Architecture" style="text;html=1;fontSize=20;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="600" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- ===== GITHUB SECTION ===== -->
+        <mxCell id="github-box" value="GitHub Repository" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="60" width="200" height="150" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="dev-branch" value="dev\nDevelopment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="30" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stg-branch" value="stg\nStaging" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="95" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="master-branch" value="master\nProduction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;" vertex="1" parent="1">
+          <mxGeometry x="160" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="code-dirs" value="• api/\n• web/\n• worker/" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="30" y="135" width="180" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- ===== GITHUB ACTIONS ===== -->
+        <mxCell id="github-actions" value="GitHub Actions\nCI/CD Pipeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="230" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ga-steps" value="1. Build Docker Images\n2. Scan for Vulnerabilities\n3. Push to ECR\n4. Tag: branch, sha, timestamp" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="30" y="240" width="180" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from GitHub to Actions -->
+        <mxCell id="arrow-github-actions" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666;" edge="1" parent="1" source="github-box" target="github-actions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- ===== AWS ECR SECTION ===== -->
+        <mxCell id="ecr-box" value="AWS ECR\n(Elastic Container Registry)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="280" y="60" width="200" height="250" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ecr-api" value="app-api\nDevelopment: dev\nStaging: stg\nProduction: master, latest" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8BBD0;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="290" y="80" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ecr-web" value="app-web\nDevelopment: dev\nStaging: stg\nProduction: master, latest" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8BBD0;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="385" y="80" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ecr-worker" value="app-worker\nDevelopment: dev\nStaging: stg\nProduction: master, latest" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8BBD0;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="290" y="155" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ecr-tags" value="Image Tags:\n✓ latest\n✓ branch-name (dev/stg/master)\n✓ sha-{commit}\n✓ timestamp" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="290" y="225" width="180" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from Actions to ECR -->
+        <mxCell id="arrow-actions-ecr" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#7B1FA2;entryX=0;entryY=0.3;" edge="1" parent="1" source="github-actions" target="ecr-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- ===== AWS INFRASTRUCTURE ===== -->
+        <mxCell id="aws-inf-box" value="AWS Infrastructure (Terraform)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2F1;strokeColor=#00695C;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="540" y="60" width="200" height="250" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="vpc" value="VPC\n10.20.0.0/16" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#B2DFDB;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="550" y="80" width="80" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="eks" value="EKS Cluster\n1.34\n2 t3.medium nodes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#B2DFDB;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="645" y="80" width="80" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="subnets" value="Subnets:\n• Public: 10.20.1.0/24, 10.20.2.0/24\n• Private: 10.20.3.0/24, 10.20.4.0/24" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="550" y="130" width="175" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="addons" value="EKS Add-ons:\n• EBS CSI Driver\n• EFS CSI Driver\n• CloudWatch Observability" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="550" y="190" width="175" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from ECR to AWS -->
+        <mxCell id="arrow-ecr-aws" value="Images pulled from" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#00695C;" edge="1" parent="1" source="ecr-box" target="aws-inf-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- ===== KUBERNETES DEPLOYMENT ===== -->
+        <mxCell id="k8s-box" value="Kubernetes (EKS) - Pod Deployments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#283593;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="430" width="720" height="150" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="api-pod" value="API Pods\n(Flask)\nPort: 5000\nReplicas: 1-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#C5CAE9;" vertex="1" parent="1">
+          <mxGeometry x="40" y="455" width="100" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="web-pod" value="Web Pods\n(Nginx)\nPort: 80\nReplicas: 1-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#C5CAE9;" vertex="1" parent="1">
+          <mxGeometry x="180" y="455" width="100" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="worker-pod" value="Worker Pods\n(Background)\nReplicas: 1-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#C5CAE9;" vertex="1" parent="1">
+          <mxGeometry x="320" y="455" width="100" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="service-ingress" value="Services & Ingress:\n• ClusterIP for internal communication\n• LoadBalancer for web access\n• Ingress for path-based routing" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="470" y="455" width="250" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from AWS to K8s -->
+        <mxCell id="arrow-aws-k8s" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#283593;" edge="1" parent="1" source="aws-inf-box" target="k8s-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- ===== BRANCH-SPECIFIC FLOW ===== -->
+        <mxCell id="branch-flow" value="Branch Deployment Strategy" style="text;html=1;fontSize=12;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="20" y="610" width="300" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-dev" value="dev branch\n↓\nBuild: app-api:dev, app-web:dev, ...\n↓\nDeploy to: dev namespace or cluster\nImage tag: :dev, :sha-xxx, :timestamp" style="text;html=1;fontSize=9;align=left;fillColor=#FFF3E0;rounded=1;strokeColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="20" y="635" width="220" height="80" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-stg" value="stg branch\n↓\nBuild: app-api:stg, app-web:stg, ...\n↓\nDeploy to: staging namespace or cluster\nImage tag: :stg, :sha-xxx, :timestamp" style="text;html=1;fontSize=9;align=left;fillColor=#FFF3E0;rounded=1;strokeColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="260" y="635" width="220" height="80" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-prod" value="master branch\n↓\nBuild: app-api:master, app-api:latest, ...\n↓\nDeploy to: default namespace / production\nImage tag: :master, :latest, :sha-xxx" style="text;html=1;fontSize=9;align=left;fillColor=#FFEBEE;rounded=1;strokeColor=#C62828;" vertex="1" parent="1">
+          <mxGeometry x="500" y="635" width="240" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend" value="Architecture Flow: Code Push → GitHub Actions → Build & Scan → Push to ECR → Deploy to EKS → Running Pods" style="text;html=1;fontSize=10;fontStyle=0;align=center;fillColor=#F5F5F5;rounded=1;strokeColor=#999;" vertex="1" parent="1">
+          <mxGeometry x="20" y="730" width="720" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
