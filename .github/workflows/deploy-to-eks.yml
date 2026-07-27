@@ -192,21 +192,33 @@ jobs:
       - name: Wait for deployments to be ready
         run: |
           echo "⏳ Waiting for deployments to be ready..."
-          kubectl rollout status deployment/api \
-            -n ${{ needs.determine-environment.outputs.namespace }} \
-            --timeout=5m
-          kubectl rollout status deployment/web \
-            -n ${{ needs.determine-environment.outputs.namespace }} \
-            --timeout=5m
-          kubectl rollout status deployment/worker \
-            -n ${{ needs.determine-environment.outputs.namespace }} \
-            --timeout=5m
+          
+          for deployment in api web worker; do
+            echo ""
+            echo "Checking $deployment deployment..."
+            kubectl rollout status deployment/$deployment \
+              -n ${{ needs.determine-environment.outputs.namespace }} \
+              --timeout=2m || {
+              echo "⚠️ Rollout status check failed. Getting pod details..."
+              kubectl get pods -n ${{ needs.determine-environment.outputs.namespace }} -l app=$deployment -o wide
+              kubectl describe pod -n ${{ needs.determine-environment.outputs.namespace }} -l app=$deployment
+              kubectl logs -n ${{ needs.determine-environment.outputs.namespace }} -l app=$deployment --tail=50
+              exit 1
+            }
+          done
+          
+          echo ""
           echo "✅ All deployments are ready!"
 
       - name: Verify pods running
+        if: always()
         run: |
           echo "📋 Pods in ${{ needs.determine-environment.outputs.namespace }} namespace:"
-          kubectl get pods -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl get pods -n ${{ needs.determine-environment.outputs.namespace }} -o wide
+          
+          echo ""
+          echo "📋 Pod Events:"
+          kubectl get events -n ${{ needs.determine-environment.outputs.namespace }} --sort-by='.lastTimestamp' | tail -20
           
           echo ""
           echo "📋 Services in ${{ needs.determine-environment.outputs.namespace }} namespace:"
