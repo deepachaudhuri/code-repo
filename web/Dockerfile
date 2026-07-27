@@ -6,7 +6,6 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy static files
 COPY index.html /usr/share/nginx/html/index.html
-COPY assets/ /usr/share/nginx/html/assets/ || true
 
 # Expose port
 EXPOSE 80
