@@ -5,7 +5,7 @@ on:
     branches:
       - dev
       - stg
-      - master
+      - master  # prod
     paths:
       - 'api/**'
       - 'web/**'

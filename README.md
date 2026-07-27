@@ -130,6 +130,7 @@ Add these secrets in GitHub repository settings:
 
 Images are automatically built and pushed on each commit:
 
+
 ```
 Development (dev branch):
 {ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/app-api:dev
