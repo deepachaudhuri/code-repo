@@ -136,22 +136,22 @@ jobs:
           
           for service in api web worker; do
             IMAGE_EXISTS=$(aws ecr describe-images \
-              --repository-name app-$service \
+              --repository-name lwplabs-$service \
               --image-ids imageTag=${{ needs.determine-environment.outputs.image-tag }} \
               --region ${{ env.AWS_REGION }} \
               --query 'imageDetails[0].imageId' || echo "NOT_FOUND")
             
             if [ "$IMAGE_EXISTS" == "NOT_FOUND" ]; then
-              echo "❌ Image app-$service:${{ needs.determine-environment.outputs.image-tag }} not found in ECR"
+              echo "❌ Image lwplabs-$service:${{ needs.determine-environment.outputs.image-tag }} not found in ECR"
               exit 1
             fi
-            echo "✅ Image app-$service:${{ needs.determine-environment.outputs.image-tag }} found in ECR"
+            echo "✅ Image lwplabs-$service:${{ needs.determine-environment.outputs.image-tag }} found in ECR"
           done
 
       - name: Deploy API service
         run: |
           kubectl set image deployment/api \
-            api=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/app-api:${{ needs.determine-environment.outputs.image-tag }} \
+            api=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-api:${{ needs.determine-environment.outputs.image-tag }} \
             --namespace=${{ needs.determine-environment.outputs.namespace }} \
             --record || \
           kubectl apply -f deployments/api-deployment.yaml \
@@ -160,7 +160,7 @@ jobs:
       - name: Deploy Web service
         run: |
           kubectl set image deployment/web \
-            web=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/app-web:${{ needs.determine-environment.outputs.image-tag }} \
+            web=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-web:${{ needs.determine-environment.outputs.image-tag }} \
             --namespace=${{ needs.determine-environment.outputs.namespace }} \
             --record || \
           kubectl apply -f deployments/web-deployment.yaml \
@@ -169,7 +169,7 @@ jobs:
       - name: Deploy Worker service
         run: |
           kubectl set image deployment/worker \
-            worker=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/app-worker:${{ needs.determine-environment.outputs.image-tag }} \
+            worker=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-worker:${{ needs.determine-environment.outputs.image-tag }} \
             --namespace=${{ needs.determine-environment.outputs.namespace }} \
             --record || \
           kubectl apply -f deployments/worker-deployment.yaml \

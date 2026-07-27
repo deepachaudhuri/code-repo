@@ -19,7 +19,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  REGISTRY_PREFIX: app
+  REGISTRY_PREFIX: lwplabs
 
 jobs:
   setup:

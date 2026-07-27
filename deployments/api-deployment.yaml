@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/app-api:dev  # Change tag: dev -> stg -> latest
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-api:dev  # Change tag: dev -> stg -> latest
         ports:
         - containerPort: 5000
           name: http

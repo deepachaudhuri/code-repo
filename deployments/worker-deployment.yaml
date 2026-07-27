@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/app-worker:dev  # Change tag: dev -> stg -> latest
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-worker:dev  # Change tag: dev -> stg -> latest
         
         # Environment variables
         env:

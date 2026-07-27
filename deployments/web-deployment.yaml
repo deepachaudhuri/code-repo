@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: web
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/app-web:dev  # Change tag: dev -> stg -> latest
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-web:dev  # Change tag: dev -> stg -> latest
         ports:
         - containerPort: 80
           name: http
