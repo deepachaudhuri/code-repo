@@ -106,6 +106,10 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Disable provenance/SBOM attestations - they create extra untagged
+          # manifests in ECR alongside the actual tagged image
+          provenance: false
+          sbom: false
 
       - name: Image digest
         run: |

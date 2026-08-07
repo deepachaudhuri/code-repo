@@ -308,6 +308,13 @@ kubectl get svc -n default
 ```
 
 **Issue: Untagged/Orphaned Images in ECR (Wasting Storage)**
+
+Root cause: Docker Buildx (`docker/build-push-action`) generates provenance/SBOM
+attestation manifests by default, which get pushed as extra untagged images
+alongside the real tagged one. Fixed in the workflow with `provenance: false`
+and `sbom: false` on the build step - now only 1 tagged image is pushed per build.
+
+Clean up old untagged images already in ECR:
 ```bash
 # View untagged images
 aws ecr describe-images \
