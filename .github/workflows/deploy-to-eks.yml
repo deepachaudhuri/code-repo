@@ -180,32 +180,47 @@ jobs:
             echo "✅ Image lwplabs-$service:${{ needs.determine-environment.outputs.image-tag }} found in ECR"
           done
 
+      - name: Ensure Nginx Ingress Controller
+        run: |
+          echo "🔌 Ensuring Nginx Ingress Controller is installed..."
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx --force-update
+          helm repo update
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx \
+            --create-namespace \
+            --set controller.service.type=LoadBalancer \
+            --wait --timeout=5m
+
       - name: Deploy API service
         run: |
-          kubectl set image deployment/api \
-            api=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-api:${{ needs.determine-environment.outputs.image-tag }} \
-            --namespace=${{ needs.determine-environment.outputs.namespace }} \
-            --record || \
+          # Always apply the manifest first so Service/HPA spec changes
+          # (e.g. LoadBalancer -> ClusterIP) actually get synced to the cluster
           kubectl apply -f deployments/api-deployment.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl set image deployment/api \
+            api=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-api:${{ needs.determine-environment.outputs.image-tag }} \
+            --namespace=${{ needs.determine-environment.outputs.namespace }}
 
       - name: Deploy Web service
         run: |
+          kubectl apply -f deployments/web-deployment.yaml \
+            -n ${{ needs.determine-environment.outputs.namespace }}
           kubectl set image deployment/web \
             web=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-web:${{ needs.determine-environment.outputs.image-tag }} \
-            --namespace=${{ needs.determine-environment.outputs.namespace }} \
-            --record || \
-          kubectl apply -f deployments/web-deployment.yaml \
+            --namespace=${{ needs.determine-environment.outputs.namespace }}
+
+      - name: Deploy Ingress
+        run: |
+          kubectl apply -f deployments/ingress.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
 
       - name: Deploy Worker service
         run: |
-          kubectl set image deployment/worker \
-            worker=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-worker:${{ needs.determine-environment.outputs.image-tag }} \
-            --namespace=${{ needs.determine-environment.outputs.namespace }} \
-            --record || \
           kubectl apply -f deployments/worker-deployment.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl set image deployment/worker \
+            worker=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-worker:${{ needs.determine-environment.outputs.image-tag }} \
+            --namespace=${{ needs.determine-environment.outputs.namespace }}
 
       - name: Scale deployments
         run: |
@@ -256,36 +271,34 @@ jobs:
           echo "📋 Services in ${{ needs.determine-environment.outputs.namespace }} namespace:"
           kubectl get svc -n ${{ needs.determine-environment.outputs.namespace }}
 
-      - name: Get LoadBalancer URLs
+      - name: Get LoadBalancer URL
         run: |
-          echo "🌐 Service URLs:"
+          echo "🌐 Ingress LoadBalancer:"
           
-          API_LB=$(kubectl get svc api -n ${{ needs.determine-environment.outputs.namespace }} \
+          INGRESS_LB=$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
-          echo "API Service: http://$API_LB:5000"
-          
-          WEB_LB=$(kubectl get svc web -n ${{ needs.determine-environment.outputs.namespace }} \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
-          echo "Web Service: http://$WEB_LB"
+          echo "Ingress LoadBalancer: http://$INGRESS_LB"
+          echo "Web (Host: lwplabs.example.com): http://$INGRESS_LB"
+          echo "API (Host: api.lwplabs.example.com): http://$INGRESS_LB"
 
       - name: Run smoke tests
         run: |
           echo "🧪 Running smoke tests..."
           
-          # Wait for LoadBalancer IP
+          # Wait for Ingress Controller LoadBalancer hostname
           for i in {1..30}; do
-            API_IP=$(kubectl get svc api -n ${{ needs.determine-environment.outputs.namespace }} \
+            INGRESS_LB=$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
               -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ ! -z "$API_IP" ]; then
+            if [ ! -z "$INGRESS_LB" ]; then
               break
             fi
             echo "Waiting for LoadBalancer ($i/30)..."
             sleep 2
           done
           
-          if [ ! -z "$API_IP" ]; then
-            echo "Testing API health endpoint..."
-            curl -f http://$API_IP:5000/health || echo "⚠️  Health check returned non-zero"
+          if [ ! -z "$INGRESS_LB" ]; then
+            echo "Testing API health endpoint via Ingress..."
+            curl -f -H "Host: api.lwplabs.example.com" http://$INGRESS_LB/health || echo "⚠️  Health check returned non-zero"
             echo ""
           else
             echo "⚠️  LoadBalancer IP not yet assigned (this is normal if just deployed)"
