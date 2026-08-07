@@ -307,6 +307,32 @@ kubectl describe ingress lwplabs-ingress -n default
 kubectl get svc -n default
 ```
 
+**Issue: Untagged/Orphaned Images in ECR (Wasting Storage)**
+```bash
+# View untagged images
+aws ecr describe-images \
+  --repository-name lwplabs-api \
+  --region us-east-1 \
+  --query 'imageDetails[?imageTags==null]'
+
+# Delete untagged images
+aws ecr batch-delete-image \
+  --repository-name lwplabs-api \
+  --region us-east-1 \
+  --image-ids imageTag=null
+```
+
+**Better: Enable ECR Lifecycle Policy** (Auto-cleanup)
+Update `infra-repo/main.tf`:
+```hcl
+module "ecr" {
+  # ... existing config ...
+  enable_default_lifecycle_policy = true
+  default_lifecycle_policy_days   = 7   # Delete untagged after 7 days
+  default_lifecycle_policy_count  = 3   # Keep last 3 tagged versions
+}
+```
+
 [⬆ Back to Top](#-quick-navigation)
 
 ---
@@ -349,18 +375,20 @@ AWS EKS Cluster (Kubernetes)
 
 ## Image Tags & Versioning
 
-Each build creates **2-3 tags for clarity & rollback capability**:
+Each build creates **2-3 tags** (NO untagged images):
 
 ```
 For dev/stg branches:
-├── :dev (or :stg)     ← Deploy this
-└── :sha-a1b2c3d       ← Rollback to specific commit
+├── :dev (or :stg)     ← Deploy to environment
+└── :sha-a1b2c3d       ← Specific commit for rollback
 
 For master branch (Production):
 ├── :master            ← Deploy this
-├── :latest            ← Always points to newest production build
+├── :latest            ← Always overwrites (newest production)
 └── :sha-a1b2c3d       ← Rollback to specific commit if needed
 ```
+
+**Important:** The workflow now **prevents empty tags** - only tagged images are pushed to ECR. This avoids orphaned/untagged images that waste storage.
 
 **Why Multiple Tags for Master?**
 - `:master` - Explicit branch tag (clear intent)

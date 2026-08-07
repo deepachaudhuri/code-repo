@@ -79,15 +79,31 @@ jobs:
           REPO_NAME="${{ env.REGISTRY_PREFIX }}-${{ matrix.service }}"
           echo "name=${REPO_NAME}" >> $GITHUB_OUTPUT
 
+      - name: Determine image tags
+        id: tags
+        run: |
+          REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          REPO="${{ steps.repo.outputs.name }}"
+          BRANCH="${{ steps.git.outputs.branch }}"
+          SHA="sha-${{ steps.git.outputs.sha }}"
+          
+          TAGS="${REGISTRY}/${REPO}:${BRANCH}"
+          TAGS="${TAGS}"$'\n'"${REGISTRY}/${REPO}:${SHA}"
+          
+          if [ "${BRANCH}" == "master" ]; then
+            TAGS="${TAGS}"$'\n'"${REGISTRY}/${REPO}:latest"
+          fi
+          
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Build, tag, and push Docker image to ECR
         uses: docker/build-push-action@v5
         with:
           context: ./${{ matrix.service }}
           push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:${{ steps.git.outputs.branch }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:sha-${{ steps.git.outputs.sha }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:${{ steps.git.outputs.branch == 'master' && 'latest' || '' }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
