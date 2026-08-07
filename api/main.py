@@ -13,6 +13,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # Get environment info
+
 HOSTNAME = socket.gethostname()
 CONTAINER_ID = os.getenv('HOSTNAME', 'unknown')
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'dev')
