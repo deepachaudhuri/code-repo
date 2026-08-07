@@ -17,6 +17,7 @@ This folder contains YAML manifests for deploying the three microservices to EKS
 2. Images already pushed to ECR with proper tags
 3. AWS account ID: `447733314827`
 4. Region: `us-east-1`
+5. GitHub Actions workflow has AWS credentials configured (for ECR access)
 
 ```bash
 # Update kubeconfig
@@ -24,6 +25,22 @@ aws eks update-kubeconfig --name lwplabs-cluster --region us-east-1
 
 # Verify kubectl access
 kubectl get nodes
+```
+
+## Important: ECR Image Pull Secret
+
+⚠️ **The GitHub Actions workflow automatically creates an ECR credentials secret** (`ecr-secret`) in the target namespace. This allows Kubernetes pods to pull images from ECR.
+
+If deploying manually:
+```bash
+# Create ECR credentials secret for manual deployments
+ECR_LOGIN=$(aws ecr get-login-password --region us-east-1)
+
+kubectl create secret docker-registry ecr-secret \
+  --docker-server=447733314827.dkr.ecr.us-east-1.amazonaws.com \
+  --docker-username=AWS \
+  --docker-password="$ECR_LOGIN" \
+  --namespace=default
 ```
 
 ---

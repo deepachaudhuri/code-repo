@@ -17,6 +17,8 @@ spec:
         app: web
         service: web
     spec:
+      imagePullSecrets:
+      - name: ecr-secret
       containers:
       - name: web
         image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-web:dev  # Change tag: dev -> stg -> latest
@@ -73,7 +75,7 @@ metadata:
   labels:
     app: web
 spec:
-  type: LoadBalancer  # External access to web service
+  type: ClusterIP  # Internal service - accessed via Nginx Ingress
   ports:
   - port: 80
     targetPort: 80

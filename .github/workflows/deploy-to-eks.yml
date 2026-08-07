@@ -130,6 +130,38 @@ jobs:
           kubectl create namespace ${{ needs.determine-environment.outputs.namespace }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Create ECR credentials secret
+        run: |
+          echo "🔐 Creating ECR credentials secret..."
+          
+          # Get ECR login token
+          ECR_LOGIN=$(aws ecr get-login-password --region ${{ env.AWS_REGION }})
+          
+          # Create docker config JSON
+          cat > /tmp/docker-config.json << EOF
+          {
+            "auths": {
+              "${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com": {
+                "auth": "$(echo -n "AWS:${ECR_LOGIN}" | base64 -w 0)"
+              }
+            }
+          }
+          EOF
+          
+          # Delete existing secret if it exists
+          kubectl delete secret ecr-secret \
+            --namespace=${{ needs.determine-environment.outputs.namespace }} \
+            --ignore-not-found=true
+          
+          # Create the secret
+          kubectl create secret docker-registry ecr-secret \
+            --docker-server=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com \
+            --docker-username=AWS \
+            --docker-password="${ECR_LOGIN}" \
+            --namespace=${{ needs.determine-environment.outputs.namespace }}
+          
+          echo "✅ ECR credentials secret created successfully"
+
       - name: Verify images in ECR
         run: |
           echo "🔍 Checking images in ECR..."

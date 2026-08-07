@@ -85,16 +85,11 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:latest
             ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:${{ steps.git.outputs.branch }}
             ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:sha-${{ steps.git.outputs.sha }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:${{ steps.git.outputs.timestamp }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ steps.repo.outputs.name }}:${{ steps.git.outputs.branch == 'master' && 'latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_DATE=${{ steps.git.outputs.timestamp }}
-            VCS_REF=${{ steps.git.outputs.sha }}
-            VERSION=${{ steps.git.outputs.branch }}-${{ steps.git.outputs.sha }}
 
       - name: Image digest
         run: |

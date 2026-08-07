@@ -17,6 +17,8 @@ spec:
         app: api
         service: api
     spec:
+      imagePullSecrets:
+      - name: ecr-secret
       containers:
       - name: api
         image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-api:dev  # Change tag: dev -> stg -> latest
@@ -77,7 +79,7 @@ metadata:
   labels:
     app: api
 spec:
-  type: LoadBalancer  # Use ClusterIP for internal, LoadBalancer for external
+  type: ClusterIP  # Internal service - accessed via Nginx Ingress
   ports:
   - port: 5000
     targetPort: 5000

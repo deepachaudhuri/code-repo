@@ -17,6 +17,8 @@ spec:
         app: worker
         service: worker
     spec:
+      imagePullSecrets:
+      - name: ecr-secret
       containers:
       - name: worker
         image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-worker:dev  # Change tag: dev -> stg -> latest

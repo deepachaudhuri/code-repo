@@ -1,0 +1,83 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lwplabs-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod  # Optional: for HTTPS
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+spec:
+  # TLS configuration (optional - uncomment if using HTTPS)
+  # tls:
+  # - hosts:
+  #   - lwplabs.example.com
+  #   secretName: lwplabs-tls
+  
+  rules:
+  # Route traffic to web service (static frontend)
+  - host: lwplabs.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port:
+              number: 80
+
+  # Route traffic to api service
+  - host: api.lwplabs.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api
+            port:
+              number: 5000
+
+  # Alternative: Single domain with path-based routing
+  # Uncomment this section and comment out the above if you prefer
+  # - host: lwplabs.example.com
+  #   http:
+  #     paths:
+  #     - path: /
+  #       pathType: Prefix
+  #       backend:
+  #         service:
+  #           name: web
+  #           port:
+  #             number: 80
+  #     - path: /api
+  #       pathType: Prefix
+  #       backend:
+  #         service:
+  #           name: api
+  #           port:
+  #             number: 5000
+
+---
+# Note: Worker service is ClusterIP-only (internal use)
+# Worker service does NOT need to be exposed via Ingress
+# It's only used for background job processing
+
+# If you need to expose worker metrics, create a separate internal service
+# Example:
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: worker-metrics
+#   namespace: default
+# spec:
+#   type: ClusterIP
+#   ports:
+#   - port: 9000
+#     targetPort: 9000
+#     name: metrics
+#   selector:
+#     app: worker
