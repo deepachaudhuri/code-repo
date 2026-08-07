@@ -20,7 +20,7 @@ COPY --from=builder /root/.local /root/.local
 # Copy application code
 COPY main.py .
 
-# Set environment variables  
+# Set environment variables   
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 
