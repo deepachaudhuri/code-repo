@@ -180,15 +180,27 @@ jobs:
             echo "✅ Image lwplabs-$service:${{ needs.determine-environment.outputs.image-tag }} found in ECR"
           done
 
-      - name: Ensure Nginx Ingress Controller
+      - name: Ensure AWS Load Balancer Controller
         run: |
-          echo "🔌 Ensuring Nginx Ingress Controller is installed..."
-          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx --force-update
+          echo "🔌 Ensuring AWS Load Balancer Controller is installed..."
+
+          VPC_ID=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query "cluster.resourcesVpcConfig.vpcId" --output text)
+
+          # IAM role created by the eks Terraform module (aws_iam_role.aws_load_balancer_controller)
+          ROLE_ARN="arn:aws:iam::${{ env.ACCOUNT_ID }}:role/${{ env.CLUSTER_NAME }}-aws-load-balancer-controller"
+
+          helm repo add eks https://aws.github.io/eks-charts --force-update
           helm repo update
-          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-            --namespace ingress-nginx \
-            --create-namespace \
-            --set controller.service.type=LoadBalancer \
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            --namespace kube-system \
+            --set clusterName=${{ env.CLUSTER_NAME }} \
+            --set region=${{ env.AWS_REGION }} \
+            --set vpcId=$VPC_ID \
+            --set serviceAccount.create=true \
+            --set serviceAccount.name=aws-load-balancer-controller \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=$ROLE_ARN \
             --wait --timeout=5m
 
       - name: Deploy API service
@@ -273,21 +285,24 @@ jobs:
 
       - name: Get LoadBalancer URL
         run: |
-          echo "🌐 Ingress LoadBalancer:"
+          echo "🌐 ALB Ingress LoadBalancer:"
           
-          INGRESS_LB=$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
+          INGRESS_LB=$(kubectl get ingress lwplabs-ingress \
+            -n ${{ needs.determine-environment.outputs.namespace }} \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
           echo "Ingress LoadBalancer: http://$INGRESS_LB"
           echo "Web (Host: lwplabs.example.com): http://$INGRESS_LB"
           echo "API (Host: api.lwplabs.example.com): http://$INGRESS_LB"
+          echo "API (path /api/*, no Host header needed): http://$INGRESS_LB/api/info"
 
       - name: Run smoke tests
         run: |
           echo "🧪 Running smoke tests..."
           
-          # Wait for Ingress Controller LoadBalancer hostname
+          # Wait for ALB Ingress LoadBalancer hostname
           for i in {1..30}; do
-            INGRESS_LB=$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
+            INGRESS_LB=$(kubectl get ingress lwplabs-ingress \
+              -n ${{ needs.determine-environment.outputs.namespace }} \
               -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             if [ ! -z "$INGRESS_LB" ]; then
               break
