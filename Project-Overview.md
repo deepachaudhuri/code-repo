@@ -1,4 +1,4 @@
-# LWPlabs - Complete Pipeline Overview
+# Complete Pipeline Overview
 
 This document explains the complete infrastructure-to-deployment pipeline.
 
