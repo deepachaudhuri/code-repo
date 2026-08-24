@@ -92,17 +92,17 @@ jobs:
           echo "name=${REPO_NAME}" >> $GITHUB_OUTPUT
 
       - name: Determine image tags
-        id# Sanitize branch name for Docker tags (replace unsafe characters)
-          BRANCH_TAG=$(echo "${BRANCH}" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
-          
-          TAGS="${REGISTRY}/${REPO}:${BRANCH_TAG
+        id: tags
         run: |
           REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           REPO="${{ steps.repo.outputs.name }}"
           BRANCH="${{ steps.git.outputs.branch }}"
           SHA="sha-${{ steps.git.outputs.sha }}"
 
-          TAGS="${REGISTRY}/${REPO}:${BRANCH}"
+          # Sanitize branch name for Docker tags (replace unsafe characters)
+          BRANCH_TAG=$(echo "${BRANCH}" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
+          
+          TAGS="${REGISTRY}/${REPO}:${BRANCH_TAG}"
           TAGS="${TAGS}"$'\n'"${REGISTRY}/${REPO}:${SHA}"
 
           if [ "${BRANCH}" == "master" ]; then
