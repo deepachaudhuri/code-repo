@@ -285,9 +285,7 @@ jobs:
         run: |
           echo "🌐 ALB Ingress LoadBalancer:"
 
-          INGRESS_LB=          git add .github/workflows/deploy-to-e          git add .github/workflows/deploy-to-eks.yml
-          git commit -m "fix: update ECR image verification to use product/login/order service names"
-          git pusht ingress lwplabs-ingress \
+          INGRESS_LB=$(kubectl get ingress lwplabs-ingress \
             -n ${{ needs.determine-environment.outputs.namespace }} \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
           echo "Ingress LoadBalancer: http://$INGRESS_LB"
