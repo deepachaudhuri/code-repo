@@ -4,94 +4,69 @@ metadata:
   name: lwplabs-ingress
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip  # required since api/web/worker are ClusterIP, not NodePort
+    alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /health
-    # ALB has no built-in CORS annotation (unlike nginx) - handle CORS in the Flask app (flask-cors) instead
-    # For HTTPS: request an ACM cert and add alb.ingress.kubernetes.io/certificate-arn + listen-ports 443
 spec:
   ingressClassName: alb
   rules:
-  # No-host rule: catches requests hitting the LB endpoint directly (no Host header match)
   - http:
       paths:
-      # /api/* goes to api service; matched path is passed through unchanged (no rewrite)
-      - path: /api
+      - path: /products
         pathType: Prefix
         backend:
           service:
-            name: api
+            name: product
             port:
               number: 5000
+      - path: /orders
+        pathType: Prefix
+        backend:
+          service:
+            name: order
+            port:
+              number: 9000
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: web
+            name: login
             port:
               number: 80
 
-  # Route traffic to web service (static frontend)
-  - host: lwplabs.example.com  # Change to your domain
+  - host: shop.lwplabs.example.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: web
+            name: login
             port:
               number: 80
 
-  # Route traffic to api service
-  - host: api.lwplabs.example.com  # Change to your domain
+  - host: product.lwplabs.example.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: api
+            name: product
             port:
               number: 5000
 
-  # Alternative: Single domain with path-based routing
-  # Uncomment this section and comment out the above if you prefer
-  # - host: lwplabs.example.com
-  #   http:
-  #     paths:
-  #     - path: /
-  #       pathType: Prefix
-  #       backend:
-  #         service:
-  #           name: web
-  #           port:
-  #             number: 80
-  #     - path: /api
-  #       pathType: Prefix
-  #       backend:
-  #         service:
-  #           name: api
-  #           port:
-  #             number: 5000
+  - host: order.lwplabs.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: order
+            port:
+              number: 9000
 
 ---
-# Note: Worker service is ClusterIP-only (internal use)
-# Worker service does NOT need to be exposed via Ingress
-# It's only used for background job processing
-
-# If you need to expose worker metrics, create a separate internal service
-# Example:
-# apiVersion: v1
-# kind: Service
-# metadata:
-#   name: worker-metrics
-#   namespace: default
-# spec:
-#   type: ClusterIP
-#   ports:
-#   - port: 9000
-#     targetPort: 9000
-#     name: metrics
-#   selector:
-#     app: worker
+# Order processing is internal by default and is only used for background job execution.
+# If you need metrics, expose a separate internal service instead.

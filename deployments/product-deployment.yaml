@@ -1,39 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: web
+  name: product
   labels:
-    app: web
-    service: web
+    app: product
+    service: product
 spec:
   replicas: 1  # Change to 2 for stg, 3 for prod
   selector:
     matchLabels:
-      app: web
+      app: product
   template:
     metadata:
       labels:
-        app: web
-        service: web
+        app: product
+        service: product
     spec:
       imagePullSecrets:
       - name: ecr-secret
       containers:
-      - name: web
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-web:dev  # Change tag: dev -> stg -> latest
+      - name: product
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:dev  # Change tag: dev -> stg -> latest
         ports:
-        - containerPort: 80
+        - containerPort: 5000
           name: http
           protocol: TCP
-        
-        # Environment variables
+
         env:
         - name: ENVIRONMENT
-          value: "development"  # Change to staging or production
+          value: "development"
         - name: VERSION
           value: "1.0.0"
-        
-        # Resource requests and limits
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+
         resources:
           requests:
             cpu: "100m"
@@ -41,58 +43,55 @@ spec:
           limits:
             cpu: "500m"
             memory: "256Mi"
-        
-        # Liveness probe
+
         livenessProbe:
           httpGet:
-            path: /
-            port: 80
+            path: /health
+            port: 5000
           initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 3
           failureThreshold: 3
-        
-        # Readiness probe
+
         readinessProbe:
           httpGet:
-            path: /
-            port: 80
+            path: /health
+            port: 5000
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 2
-      
-      # Pod restart policy
+
       restartPolicy: Always
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: web
+  name: product
   labels:
-    app: web
+    app: product
 spec:
-  type: ClusterIP  # Internal service - accessed via Nginx Ingress
+  type: ClusterIP
   ports:
-  - port: 80
-    targetPort: 80
+  - port: 5000
+    targetPort: 5000
     protocol: TCP
     name: http
   selector:
-    app: web
+    app: product
   sessionAffinity: None
 
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: web-hpa
+  name: product-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: web
+    name: product
   minReplicas: 1
   maxReplicas: 5
   metrics:

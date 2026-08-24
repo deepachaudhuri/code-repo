@@ -1,22 +1,21 @@
-# LWPlabs - Multi-Service Microservices Application
+# LWPlabs - E-Commerce Microservices Example
 
-Build, push, and deploy three microservices to AWS EKS with Kubernetes Ingress routing.
+This project demonstrates an e-commerce platform built as three microservices: product catalog, login, and order processing. It is designed to show how to build, push, and deploy a containerized AWS EKS application using GitHub Actions and Terraform.
 
 ---
 
 ## 📋 Quick Navigation
 
 - [Quick Architecture](#quick-architecture) - Visual diagram
-- [Services Overview](#services-overview) - Web, API, Worker services
+- [Services Overview](#services-overview) - Product, Login, Order services
 - [Development Workflow](#development-workflow) - Push → Build → Deploy
-- [Why Nginx Ingress?](#why-nginx-ingress-not-3-loadbalancers) - Cost & architecture comparison
+- [Why Ingress?](#why-nginx-ingress-not-3-loadbalancers) - Cost & architecture comparison
 - [Branch Strategy](#branch-strategy) - dev/stg/master
 - [Setup Requirements](#setup-requirements) - Prerequisites & secrets
 - [Deployment Guide](#deployment-guide) - How to deploy
 - [Troubleshooting](#troubleshooting) - Common issues
 - [AWS Architecture](#aws-architecture) - Full infrastructure
 - [Common Commands](#common-commands) - kubectl snippets
-- [Monitoring & Logs](#monitoring--logs) - Debugging
 
 ---
 
@@ -24,45 +23,39 @@ Build, push, and deploy three microservices to AWS EKS with Kubernetes Ingress r
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  Internet Client Requests                          │
+│  Internet Customer Traffic                          │
 └────────────────┬─────────────────────────────────┘
                  ▼
 ┌────────────────────────────────────────────────────┐
-│  AWS LoadBalancer (Created by Ingress Controller)  │
+│  AWS LoadBalancer (Ingress Controller)              │
 │  ✅ ONE LoadBalancer = $16/month                   │
-│  Exposes: Public IP / DNS                          │
+│  Public access for the storefront and APIs         │
 └────────────────┬─────────────────────────────────┘
                  ▼
 ┌────────────────────────────────────────────────────┐
-│  Nginx Ingress Controller (Pod in Kubernetes)      │
-│  Smart router: Reads Ingress rules & routes traffic│
+│  Nginx Ingress Controller                          │
+│  Routes requests by host/path to the right service │
 └─┬──────────────────────┬──────────────────────┬──┘
-  │ Host: lwplabs.com    │ Host: api.lwplabs.com│  (Internal only)
-  ▼                      ▼                       ▼
-┌─────────────┐    ┌─────────────┐    ┌──────────────────┐
-│ Web Service │    │ API Service │    │ Worker Service   │
-│(ClusterIP)  │    │(ClusterIP)  │    │ (ClusterIP only) │
-│NO LB needed │    │NO LB needed │    │  NO LB needed    │
-│ Port 80     │    │ Port 5000   │    │  Internal only   │
-└─────────────┘    └─────────────┘    └──────────────────┘
-     ↓                   ↓                      ↓
-┌─────────────┐    ┌─────────────┐    ┌──────────────────┐
-│ Web Pods    │    │ API Pods    │    │ Worker Pods      │
-│ (Nginx)     │    │ (Flask)     │    │ (Python)         │
-└─────────────┘    └─────────────┘    └──────────────────┘
+  │ shop.lwplabs.com     │ product.lwplabs.com │ order.lwplabs.com
+  ▼                      ▼                     ▼
+┌───────────────┐    ┌───────────────┐   ┌──────────────────┐
+│ Login Service │    │ Product Service│   │ Order Service    │
+│(ClusterIP)    │    │(ClusterIP)     │   │(ClusterIP)       │
+│ Port 80       │    │ Port 5000      │   │ Internal only    │
+└───────────────┘    └───────────────┘   └──────────────────┘
+     ↓                   ↓                     ↓
+┌───────────────┐    ┌───────────────┐   ┌──────────────────┐
+│ Login Pods    │    │ Product Pods  │   │ Order Worker Pods │
+│ (Nginx)       │    │ (Flask API)   │   │ (Python)          │
+└───────────────┘    └───────────────┘   └──────────────────┘
 ```
 
-**Traffic Flow Explained:**
-1. Client requests → **AWS LoadBalancer** (public IP)
-2. LoadBalancer → **Nginx Ingress Controller** (pod inside cluster)
-3. Ingress Controller reads hostname/path → **routes to correct service**
-4. Service → **Pod** runs your application
-
-**Key Points:**
-- 🌐 **Single LoadBalancer**: Nginx Ingress Controller creates ONE AWS LoadBalancer (not three)
-- 🔄 **Smart Routing**: Ingress reads rules → routes to correct internal service
-- 💰 **Cost Efficient**: $16/month for 1 LB (vs $144/month for 3 separate LBs)
-- 📦 **Three Services**: Web, API, Worker all are ClusterIP (internal only, no LoadBalancers)
+**Flow:**
+1. Customer visits the storefront
+2. Ingress routes traffic to the correct service
+3. Product APIs return catalog data
+4. Login handles authentication
+5. Order workers process checkout events
 
 ---
 
@@ -70,11 +63,9 @@ Build, push, and deploy three microservices to AWS EKS with Kubernetes Ingress r
 
 | Service | Language | Port | Access | Purpose |
 |---------|----------|------|--------|---------|
-| **Web** | Nginx | 80 | Public (via Ingress) | Static frontend |
-| **API** | Python/Flask | 5000 | Public (via Ingress) | REST API backend |
-| **Worker** | Python | - | Internal only | Async tasks |
-
-[⬆ Back to Top](#-quick-navigation)
+| **Login** | Nginx | 80 | Public (via Ingress) | Customer sign-in and storefront |
+| **Product** | Python/Flask | 5000 | Public (via Ingress) | Product catalog and inventory API |
+| **Order** | Python | - | Internal only | Checkout and order processing |
 
 ---
 
@@ -83,7 +74,7 @@ Build, push, and deploy three microservices to AWS EKS with Kubernetes Ingress r
 ### 1. Push Code to GitHub
 ```bash
 git add .
-git commit -m "feature: description"
+git commit -m "feature: update storefront"
 
 # Deploy to dev environment
 git push origin dev
@@ -110,16 +101,14 @@ kubectl get ingress -n default
 
 Update `/etc/hosts` or DNS:
 ```
-YOUR_LOAD_BALANCER_IP  lwplabs.example.com
-YOUR_LOAD_BALANCER_IP  api.lwplabs.example.com
+YOUR_LOAD_BALANCER_IP  shop.lwplabs.example.com
+YOUR_LOAD_BALANCER_IP  product.lwplabs.example.com
 ```
 
 Then access:
-- **Frontend**: http://lwplabs.example.com
-- **API**: http://api.lwplabs.example.com
-- **API Health**: http://api.lwplabs.example.com/health
-
-[⬆ Back to Top](#-quick-navigation)
+- **Storefront/Login**: http://shop.lwplabs.example.com
+- **Product API**: http://product.lwplabs.example.com/products
+- **Order API/Health**: http://product.lwplabs.example.com/orders/health
 
 ---
 
@@ -128,42 +117,26 @@ Then access:
 ### ❌ Bad Approach: Three LoadBalancer Services
 
 ```
-❌ web service type: LoadBalancer → Creates AWS LoadBalancer #1 ($16/month)
-❌ api service type: LoadBalancer → Creates AWS LoadBalancer #2 ($16/month)
-❌ worker service type: LoadBalancer → Creates AWS LoadBalancer #3 ($16/month)
+❌ login service type: LoadBalancer → Creates AWS LoadBalancer #1 ($16/month)
+❌ product service type: LoadBalancer → Creates AWS LoadBalancer #2 ($16/month)
+❌ order service type: LoadBalancer → Creates AWS LoadBalancer #3 ($16/month)
 
-Total Cost: $48/month just for LoadBalancers
-Total IPs: 3 different public IPs (confusing)
+Total Cost: $48/month just for load balancers
+Total IPs: 3 different public IPs
 ```
 
 ### ✅ Good Approach: Nginx Ingress + ClusterIP
 
 ```
 ✅ Nginx Ingress Controller → Creates AWS LoadBalancer #1 ($16/month)
-✅ web service type: ClusterIP → No LoadBalancer
-✅ api service type: ClusterIP → No LoadBalancer
-✅ worker service type: ClusterIP → No LoadBalancer
+✅ login service type: ClusterIP → No LoadBalancer
+✅ product service type: ClusterIP → No LoadBalancer
+✅ order service type: ClusterIP → No LoadBalancer
 
 Total Cost: $16/month (saves $32/month!)
 Total IPs: 1 public IP (simple)
-Ingress: Smart routing based on hostname/path
+Ingress: Smart routing by host and path
 ```
-
----
-
-## LoadBalancer vs Ingress Comparison
-
-| Aspect | Multiple LoadBalancers | Nginx Ingress |
-|--------|------------------------|--------------:|
-| **Public IPs** | 3 (one per service) | 1 (Ingress Controller) |
-| **AWS Cost** | $48/month | $16/month |
-| **Routing** | External DNS (manual) | Kubernetes native (automatic) |
-| **SSL/TLS** | Per service | Centralized |
-| **Domains** | 3 separate IPs | 1 IP, multiple hostnames |
-| **Scalability** | Hard to add services | Easy - just add Ingress rule |
-| **Complexity** | High (3 LBs to manage) | Low (1 Ingress to manage) |
-
-[⬆ Back to Top](#-quick-navigation)
 
 ---
 
@@ -181,29 +154,29 @@ Ingress: Smart routing based on hostname/path
 
 ```
 code-repo/
-├── api/                          # Flask REST API
+├── product/                     # Flask product catalog API
 │   ├── Dockerfile
 │   ├── main.py
 │   └── requirements.txt
-├── web/                          # Nginx frontend
+├── login/                       # Nginx storefront/login UI
 │   ├── Dockerfile
 │   ├── index.html
 │   └── nginx.conf
-├── worker/                       # Python background jobs
+├── order/                       # Python order processing worker
 │   ├── Dockerfile
 │   ├── worker.py
 │   └── requirements.txt
-├── deployments/                  # Kubernetes manifests
-│   ├── api-deployment.yaml
-│   ├── web-deployment.yaml
-│   ├── worker-deployment.yaml
-│   ├── ingress.yaml              # Nginx Ingress config
+├── deployments/                 # Kubernetes manifests
+│   ├── product-deployment.yaml
+│   ├── login-deployment.yaml
+│   ├── order-deployment.yaml
+│   ├── ingress.yaml
 │   ├── namespaces.yaml
 │   └── DEPLOYMENT_GUIDE.md
-├── .github/workflows/            # CI/CD
-│   ├── build-and-push.yml        # Build & push images
-│   └── deploy-to-eks.yml         # Deploy to EKS
-└── README.md                     # This file
+├── .github/workflows/           # CI/CD
+│   ├── build-and-push.yml
+│   └── deploy-to-eks.yml
+└── README.md                    # This file
 ```
 
 ---
@@ -232,8 +205,6 @@ aws eks update-kubeconfig --name lwplabs-cluster --region us-east-1
 kubectl get nodes
 ```
 
-[⬆ Back to Top](#-quick-navigation)
-
 ---
 
 ## Deployment Guide
@@ -244,9 +215,9 @@ kubectl get nodes
 kubectl create namespace default
 
 # Deploy all services
-kubectl apply -f deployments/api-deployment.yaml
-kubectl apply -f deployments/web-deployment.yaml
-kubectl apply -f deployments/worker-deployment.yaml
+kubectl apply -f deployments/product-deployment.yaml
+kubectl apply -f deployments/login-deployment.yaml
+kubectl apply -f deployments/order-deployment.yaml
 
 # Deploy Ingress (routes traffic to services)
 kubectl apply -f deployments/ingress.yaml
@@ -268,9 +239,9 @@ kubectl get svc -n default
 kubectl describe ingress lwplabs-ingress -n default
 
 # View logs
-kubectl logs deployment/api -n default
-kubectl logs deployment/web -n default
-kubectl logs deployment/worker -n default
+kubectl logs deployment/product -n default
+kubectl logs deployment/login -n default
+kubectl logs deployment/order -n default
 ```
 
 ### Troubleshooting
@@ -318,13 +289,13 @@ Clean up old untagged images already in ECR:
 ```bash
 # View untagged images
 aws ecr describe-images \
-  --repository-name lwplabs-api \
+  --repository-name lwplabs-product \
   --region us-east-1 \
   --query 'imageDetails[?imageTags==null]'
 
 # Delete untagged images
 aws ecr batch-delete-image \
-  --repository-name lwplabs-api \
+  --repository-name lwplabs-product \
   --region us-east-1 \
   --image-ids imageTag=null
 ```
@@ -359,23 +330,23 @@ AWS EKS Cluster (Kubernetes)
   ├── Nginx Ingress Controller (Pod)
   │   └── Routes traffic based on hostnames/paths
   ├── Services (All ClusterIP - Internal)
-  │   ├── web (Port 80)
-  │   ├── api (Port 5000)
-  │   └── worker (Internal only)
+  │   ├── login (Port 80)
+  │   ├── product (Port 5000)
+  │   └── order (Internal only)
   └── Pods (Running containers)
 ```
 
 **How it Works:**
 1. Nginx Ingress Controller creates a **LoadBalancer Service** in AWS
 2. This creates **ONE AWS LoadBalancer** with a public IP
-3. Your three services (web, api, worker) are **ClusterIP** (no LoadBalancers for them)
+3. Your three services (login, product, order) are **ClusterIP** (no LoadBalancers for them)
 4. Traffic: Internet → AWS LoadBalancer → Nginx Ingress → Routes to correct service
 
 **Infrastructure (Terraform-managed):**
 - **VPC**: 10.20.0.0/16 with public & private subnets
 - **EKS Cluster**: Kubernetes 1.34
 - **Node Group**: 2 t3.medium instances (min: 1, max: 4)
-- **ECR**: 3 repositories (api, web, worker) with image scanning
+- **ECR**: 3 repositories (product, login, order) with image scanning
 - **LoadBalancer**: 1 AWS LoadBalancer (created by Ingress Controller)
 
 ---
@@ -405,16 +376,16 @@ For master branch (Production):
 **Example Deployments:**
 ```bash
 # Deploy development
-kubectl set image deployment/api api=lwplabs-api:dev
+kubectl set image deployment/product product=lwplabs-product:dev
 
 # Deploy staging
-kubectl set image deployment/api api=lwplabs-api:stg
+kubectl set image deployment/product product=lwplabs-product:stg
 
 # Deploy production (latest)
-kubectl set image deployment/api api=lwplabs-api:latest
+kubectl set image deployment/product product=lwplabs-product:latest
 
 # Rollback to specific commit (if latest has issues)
-kubectl set image deployment/api api=lwplabs-api:sha-a1b2c3d
+kubectl set image deployment/product product=lwplabs-product:sha-a1b2c3d
 ```
 
 **Why `:latest` Gets Overwritten:**
@@ -431,20 +402,20 @@ kubectl set image deployment/api api=lwplabs-api:sha-a1b2c3d
 kubectl get pods -n default -o wide
 
 # View pod logs
-kubectl logs -f deployment/api -n default
+kubectl logs -f deployment/product -n default
 
 # Scale deployment
-kubectl scale deployment api --replicas=3 -n default
+kubectl scale deployment product --replicas=3 -n default
 
 # Rollback to previous version
-kubectl rollout undo deployment/api -n default
+kubectl rollout undo deployment/product -n default
 
 # Get service details
 kubectl get svc -n default
-kubectl describe svc api -n default
+kubectl describe svc product -n default
 
 # Port forward for local testing
-kubectl port-forward svc/api 5000:5000 -n default
+kubectl port-forward svc/product 5000:5000 -n default
 
 # Execute commands in pod
 kubectl exec -it pod-name -- /bin/sh
@@ -469,16 +440,16 @@ kubectl get events -n default --sort-by='.lastTimestamp'
 ### kubectl Logs
 ```bash
 # View current logs
-kubectl logs deployment/api -n default
+kubectl logs deployment/product -n default
 
 # Follow logs (tail)
-kubectl logs -f deployment/api -n default
+kubectl logs -f deployment/product -n default
 
 # View last 100 lines
-kubectl logs deployment/api -n default --tail=100
+kubectl logs deployment/product -n default --tail=100
 
 # View all pod logs for a service
-kubectl logs -l app=api -n default
+kubectl logs -l app=product -n default
 ```
 
 ### Pod Metrics

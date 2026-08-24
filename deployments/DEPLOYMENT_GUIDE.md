@@ -1,224 +1,83 @@
 # Kubernetes Deployment Guide
 
-This folder contains YAML manifests for deploying the three microservices to EKS.
+This folder contains YAML manifests for deploying the e-commerce example to EKS.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `namespaces.yaml` | Create dev, stg, prod namespaces |
-| `api-deployment.yaml` | Deploy Flask API service |
-| `web-deployment.yaml` | Deploy Nginx web service |
-| `worker-deployment.yaml` | Deploy Python worker service |
+| `product-deployment.yaml` | Deploy the product catalog service |
+| `login-deployment.yaml` | Deploy the storefront/login service |
+| `order-deployment.yaml` | Deploy the order processing worker |
 
 ## Prerequisites
 
 1. EKS cluster running and kubectl configured
 2. Images already pushed to ECR with proper tags
-3. AWS account ID: `447733314827`
-4. Region: `us-east-1`
-5. GitHub Actions workflow has AWS credentials configured (for ECR access)
+3. AWS region: `us-east-1`
+4. GitHub Actions workflow has AWS credentials configured
 
 ```bash
-# Update kubeconfig
 aws eks update-kubeconfig --name lwplabs-cluster --region us-east-1
-
-# Verify kubectl access
 kubectl get nodes
 ```
 
-## Important: ECR Image Pull Secret
-
-⚠️ **The GitHub Actions workflow automatically creates an ECR credentials secret** (`ecr-secret`) in the target namespace. This allows Kubernetes pods to pull images from ECR.
-
-If deploying manually:
-```bash
-# Create ECR credentials secret for manual deployments
-ECR_LOGIN=$(aws ecr get-login-password --region us-east-1)
-
-kubectl create secret docker-registry ecr-secret \
-  --docker-server=447733314827.dkr.ecr.us-east-1.amazonaws.com \
-  --docker-username=AWS \
-  --docker-password="$ECR_LOGIN" \
-  --namespace=default
-```
-
----
-
 ## Deployment Steps
 
-### Step 1: Create Namespaces
-
+### Step 1: Create namespaces
 ```bash
 kubectl apply -f namespaces.yaml
 ```
 
-**Output:**
-```
-namespace/dev created
-namespace/stg created
-namespace/prod created
+### Step 2: Deploy to development
+```bash
+kubectl apply -f product-deployment.yaml -n dev
+kubectl apply -f login-deployment.yaml -n dev
+kubectl apply -f order-deployment.yaml -n dev
 ```
 
-**Verify:**
+### Step 3: Deploy to staging
 ```bash
-kubectl get namespaces
+kubectl apply -f product-deployment.yaml -n stg
+kubectl apply -f login-deployment.yaml -n stg
+kubectl apply -f order-deployment.yaml -n stg
+```
+
+### Step 4: Deploy to production
+```bash
+kubectl apply -f product-deployment.yaml
+kubectl apply -f login-deployment.yaml
+kubectl apply -f order-deployment.yaml
+```
+
+## Accessing services
+
+### Product catalog
+```bash
+kubectl port-forward -n dev svc/product 5000:5000
+curl http://localhost:5000/products
+```
+
+### Login storefront
+```bash
+kubectl port-forward -n dev svc/login 80:80
+curl http://localhost:80
+```
+
+### Order worker logs
+```bash
+kubectl logs -f deployment/order -n dev
 ```
 
 ---
 
-### Step 2: Deploy to Development (dev branch)
+## Monitoring
 
-Update image tags to `dev` and replicas to 1:
-
-```bash
-# Edit api-deployment.yaml
-# Change: replicas: 1 (keep as is)
-# Change: image tag from :dev to :dev
-# Change: namespace from default to dev
-
-kubectl apply -f api-deployment.yaml -n dev
-kubectl apply -f web-deployment.yaml -n dev
-kubectl apply -f worker-deployment.yaml -n dev
-```
-
-**Verify pods are running:**
 ```bash
 kubectl get pods -n dev
 kubectl get svc -n dev
-```
-
-**Expected output:**
-```
-NAME                    READY   STATUS    RESTARTS
-api-xxxxxxxxxx-xxxxx    1/1     Running   0
-web-xxxxxxxxxx-xxxxx    1/1     Running   0
-worker-xxxxxxxxxx-xxxxx 1/1     Running   0
-```
-
----
-
-### Step 3: Deploy to Staging (stg branch)
-
-Update image tags to `stg` and replicas to 2:
-
-**Before deploying**, edit the YAML files:
-
-```bash
-# For each file, change:
-# 1. namespace: stg
-# 2. image tag: :stg
-# 3. replicas: 2 (api and web), 1 (worker)
-
-kubectl apply -f api-deployment.yaml -n stg
-kubectl apply -f web-deployment.yaml -n stg
-kubectl apply -f worker-deployment.yaml -n stg
-```
-
-**Verify:**
-```bash
-kubectl get pods -n stg
-kubectl get svc -n stg
-```
-
----
-
-### Step 4: Deploy to Production (master branch)
-
-Update image tags to `latest` (or `master`) and replicas to 3:
-
-**Before deploying**, edit the YAML files:
-
-```bash
-# For each file, change:
-# 1. namespace: prod (or default)
-# 2. image tag: :latest (or :master)
-# 3. replicas: 3 (api and web), 2 (worker)
-
-kubectl apply -f api-deployment.yaml
-kubectl apply -f web-deployment.yaml
-kubectl apply -f worker-deployment.yaml
-```
-
-**Verify:**
-```bash
-kubectl get pods
-kubectl get svc
-```
-
----
-
-## Quick Deploy Commands
-
-### Deploy All Services to Dev
-```bash
-kubectl apply -f namespaces.yaml
-kubectl apply -f api-deployment.yaml -n dev
-kubectl apply -f web-deployment.yaml -n dev
-kubectl apply -f worker-deployment.yaml -n dev
-```
-
-### Deploy All Services to Staging
-```bash
-kubectl apply -f api-deployment.yaml -n stg
-kubectl apply -f web-deployment.yaml -n stg
-kubectl apply -f worker-deployment.yaml -n stg
-```
-
-### Deploy All Services to Production
-```bash
-kubectl apply -f api-deployment.yaml
-kubectl apply -f web-deployment.yaml
-kubectl apply -f worker-deployment.yaml
-```
-
----
-
-## Accessing Services
-
-### Get External IPs/Load Balancer URLs
-
-```bash
-# Dev environment
-kubectl get svc -n dev
-NAME      TYPE           CLUSTER-IP      EXTERNAL-IP
-api       LoadBalancer   10.100.xxx.xxx  a1b2c3d4-xxxx.us-east-1.elb.amazonaws.com
-web       LoadBalancer   10.100.xxx.xxx  a1b2c3d5-xxxx.us-east-1.elb.amazonaws.com
-```
-
-### Access Web Service
-```bash
-# Get the LoadBalancer URL
-kubectl get svc web -n dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-
-# Open in browser
-# http://a1b2c3d5-xxxx.us-east-1.elb.amazonaws.com
-```
-
-### Access API Service
-```bash
-# Port-forward for local testing
-kubectl port-forward -n dev svc/api 5000:5000
-
-# In another terminal
-curl http://localhost:5000/health
-curl http://localhost:5000/api/info
-```
-
----
-
-## Monitoring & Troubleshooting
-
-### Check Pod Logs
-```bash
-# API logs
-kubectl logs -f deployment/api -n dev
-
-# Web logs
-kubectl logs -f deployment/web -n dev
-
-# Worker logs
-kubectl logs -f deployment/worker -n dev
+kubectl describe ingress lwplabs-ingress -n default
 ```
 
 ### Check Pod Events
@@ -244,34 +103,34 @@ kubectl describe hpa api -n dev
 
 ### Update Image Tag
 ```bash
-# Update API to new image
-kubectl set image deployment/api \
-  api=447733314827.dkr.ecr.us-east-1.amazonaws.com/app-api:sha-abc123 \
+# Update Product service to a new image
+kubectl set image deployment/product \
+  product=447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:sha-abc123 \
   -n dev
 
 # Verify rollout
-kubectl rollout status deployment/api -n dev
+kubectl rollout status deployment/product -n dev
 ```
 
 ### Scale Replicas Manually
 ```bash
-# Scale API to 5 replicas
-kubectl scale deployment api --replicas=5 -n dev
+# Scale Product service to 5 replicas
+kubectl scale deployment product --replicas=5 -n dev
 
 # View status
-kubectl get deployment api -n dev
+kubectl get deployment product -n dev
 ```
 
 ### Rollback Deployment
 ```bash
 # View rollout history
-kubectl rollout history deployment/api -n dev
+kubectl rollout history deployment/product -n dev
 
 # Rollback to previous version
-kubectl rollout undo deployment/api -n dev
+kubectl rollout undo deployment/product -n dev
 
 # Rollback to specific revision
-kubectl rollout undo deployment/api --to-revision=2 -n dev
+kubectl rollout undo deployment/product --to-revision=2 -n dev
 ```
 
 ---
@@ -281,9 +140,9 @@ kubectl rollout undo deployment/api --to-revision=2 -n dev
 ### Delete Services
 ```bash
 # Delete all from dev
-kubectl delete -f api-deployment.yaml -n dev
-kubectl delete -f web-deployment.yaml -n dev
-kubectl delete -f worker-deployment.yaml -n dev
+kubectl delete -f product-deployment.yaml -n dev
+kubectl delete -f login-deployment.yaml -n dev
+kubectl delete -f order-deployment.yaml -n dev
 
 # OR delete entire namespace
 kubectl delete namespace dev
@@ -312,7 +171,7 @@ resources:
 
 ### For Staging
 ```yaml
-replicas: 2  # API & Web; 1 for Worker
+replicas: 2  # Product & Login; 1 for Order
 resources:
   requests:
     cpu: "200m"
@@ -324,7 +183,7 @@ resources:
 
 ### For Production
 ```yaml
-replicas: 3  # API & Web; 2 for Worker
+replicas: 3  # Product & Login; 2 for Order
 resources:
   requests:
     cpu: "500m"
@@ -366,18 +225,18 @@ For automated deployments based on branch pushes:
 
 ```bash
 # Development (on dev branch push)
-kubectl set image deployment/api \
-  api=447733314827.dkr.ecr.us-east-1.amazonaws.com/app-api:dev \
+kubectl set image deployment/product \
+  product=447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:dev \
   -n dev
 
 # Staging (on stg branch push)
-kubectl set image deployment/api \
-  api=447733314827.dkr.ecr.us-east-1.amazonaws.com/app-api:stg \
+kubectl set image deployment/product \
+  product=447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:stg \
   -n stg
 
 # Production (on master branch push)
-kubectl set image deployment/api \
-  api=447733314827.dkr.ecr.us-east-1.amazonaws.com/app-api:latest
+kubectl set image deployment/product \
+  product=447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:latest
 ```
 
 ---
@@ -401,7 +260,7 @@ kubectl set image deployment/api \
 kubectl get all -n dev
 
 # Port-forward to service
-kubectl port-forward -n dev svc/api 5000:5000
+kubectl port-forward -n dev svc/product 5000:5000
 
 # Get pods with labels
 kubectl get pods -n dev --show-labels
@@ -424,7 +283,7 @@ kubectl cp dev/<pod-name>:/path/to/file ./local-file
 ## Support
 
 For issues:
-1. Check pod logs: `kubectl logs -f deployment/api -n dev`
+1. Check pod logs: `kubectl logs -f deployment/product -n dev`
 2. Check pod events: `kubectl describe pod <pod-name> -n dev`
 3. Check resource usage: `kubectl top pods -n dev`
 4. Check image exists in ECR

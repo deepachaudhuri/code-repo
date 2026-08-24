@@ -1,4 +1,4 @@
-# Nginx-based web service
+# Nginx-based login storefront service
 FROM nginx:1.24-alpine
 
 # Copy custom Nginx configuration

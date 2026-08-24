@@ -1,39 +1,37 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: worker
+  name: login
   labels:
-    app: worker
-    service: worker
+    app: login
+    service: login
 spec:
-  replicas: 1  # Change to 1 for stg, 2 for prod
+  replicas: 1  # Change to 2 for stg, 3 for prod
   selector:
     matchLabels:
-      app: worker
+      app: login
   template:
     metadata:
       labels:
-        app: worker
-        service: worker
+        app: login
+        service: login
     spec:
       imagePullSecrets:
       - name: ecr-secret
       containers:
-      - name: worker
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-worker:dev  # Change tag: dev -> stg -> latest
-        
-        # Environment variables
+      - name: login
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-login:dev  # Change tag: dev -> stg -> latest
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+
         env:
         - name: ENVIRONMENT
-          value: "development"  # Change to staging or production
+          value: "development"
         - name: VERSION
           value: "1.0.0"
-        - name: HOSTNAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        
-        # Resource requests and limits
+
         resources:
           requests:
             cpu: "100m"
@@ -41,56 +39,67 @@ spec:
           limits:
             cpu: "500m"
             memory: "256Mi"
-        
-        # Liveness probe (check if worker_healthy file exists)
+
         livenessProbe:
-          exec:
-            command:
-            - test
-            - -f
-            - /tmp/worker_healthy
+          httpGet:
+            path: /
+            port: 80
           initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 3
           failureThreshold: 3
-      
-      # Pod restart policy
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+
       restartPolicy: Always
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: worker
+  name: login
   labels:
-    app: worker
+    app: login
 spec:
-  type: ClusterIP  # Internal service only
+  type: ClusterIP
   ports:
-  - port: 9000
-    targetPort: 9000
+  - port: 80
+    targetPort: 80
     protocol: TCP
-    name: metrics
+    name: http
   selector:
-    app: worker
+    app: login
   sessionAffinity: None
 
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: worker-hpa
+  name: login-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: worker
+    name: login
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 5
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 75
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

@@ -1,4 +1,4 @@
-# Python-based worker service
+# Python-based order processing worker service
 FROM python:3.11-slim
 
 WORKDIR /app

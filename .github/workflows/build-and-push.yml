@@ -5,17 +5,17 @@ on:
     branches:
       - dev
       - stg
-      - master  # prod
+      - master
     paths:
-      - 'api/**'
-      - 'web/**'
-      - 'worker/**'
+      - 'product/**'
+      - 'login/**'
+      - 'order/**'
       - '.github/workflows/build-and-push.yml'
   pull_request:
     branches:
       - dev
       - stg
-      - master ##prod
+      - master
 
 env:
   AWS_REGION: us-east-1
@@ -31,7 +31,7 @@ jobs:
       - name: Set build matrix
         id: services
         run: |
-          echo "services=[\"api\", \"web\", \"worker\"]" >> $GITHUB_OUTPUT
+          echo "services=[\"product\", \"login\", \"order\"]" >> $GITHUB_OUTPUT
 
   build-and-push:
     name: Build and Push ${{ matrix.service }} to ECR
@@ -41,11 +41,11 @@ jobs:
       matrix:
         service: ${{ fromJson(needs.setup.outputs.services) }}
       fail-fast: false
-    
+
     permissions:
       id-token: write
       contents: read
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -86,14 +86,14 @@ jobs:
           REPO="${{ steps.repo.outputs.name }}"
           BRANCH="${{ steps.git.outputs.branch }}"
           SHA="sha-${{ steps.git.outputs.sha }}"
-          
+
           TAGS="${REGISTRY}/${REPO}:${BRANCH}"
           TAGS="${TAGS}"$'\n'"${REGISTRY}/${REPO}:${SHA}"
-          
+
           if [ "${BRANCH}" == "master" ]; then
             TAGS="${TAGS}"$'\n'"${REGISTRY}/${REPO}:latest"
           fi
-          
+
           echo "tags<<EOF" >> $GITHUB_OUTPUT
           echo "$TAGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -106,8 +106,6 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Disable provenance/SBOM attestations - they create extra untagged
-          # manifests in ECR alongside the actual tagged image
           provenance: false
           sbom: false
 
@@ -127,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stg' || github.ref == 'refs/heads/dev')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -143,20 +141,20 @@ jobs:
         run: |
           echo "## ECR Repositories" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          for service in api web worker; do
+
+          for service in product login order; do
             REPO_NAME="${{ env.REGISTRY_PREFIX }}-${service}"
             REPO_URL=$(aws ecr describe-repositories \
               --repository-names "${REPO_NAME}" \
               --region ${{ env.AWS_REGION }} \
               --query 'repositories[0].repositoryUri' \
               --output text 2>/dev/null || echo "Not found")
-            
+
             if [ "${REPO_URL}" != "Not found" ]; then
               echo "- **${service}:** \`${REPO_URL}\`" >> $GITHUB_STEP_SUMMARY
             fi
           done
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Deploy to EKS cluster using images from above repositories" >> $GITHUB_STEP_SUMMARY
@@ -183,7 +181,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-and-push]
     if: always()
-    
+
     steps:
       - name: Build Status
         run: |

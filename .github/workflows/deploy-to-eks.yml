@@ -35,9 +35,9 @@ jobs:
       environment: ${{ steps.env.outputs.environment }}
       image-tag: ${{ steps.env.outputs.image-tag }}
       namespace: ${{ steps.env.outputs.namespace }}
-      replicas-api: ${{ steps.env.outputs.replicas-api }}
-      replicas-web: ${{ steps.env.outputs.replicas-web }}
-      replicas-worker: ${{ steps.env.outputs.replicas-worker }}
+      replicas-product: ${{ steps.env.outputs.replicas-product }}
+      replicas-login: ${{ steps.env.outputs.replicas-login }}
+      replicas-order: ${{ steps.env.outputs.replicas-order }}
     steps:
       - name: Determine environment from branch
         id: env
@@ -67,25 +67,25 @@ jobs:
               echo "environment=dev" >> $GITHUB_OUTPUT
               echo "image-tag=dev" >> $GITHUB_OUTPUT
               echo "namespace=dev" >> $GITHUB_OUTPUT
-              echo "replicas-api=1" >> $GITHUB_OUTPUT
-              echo "replicas-web=1" >> $GITHUB_OUTPUT
-              echo "replicas-worker=1" >> $GITHUB_OUTPUT
+              echo "replicas-product=1" >> $GITHUB_OUTPUT
+              echo "replicas-login=1" >> $GITHUB_OUTPUT
+              echo "replicas-order=1" >> $GITHUB_OUTPUT
               ;;
             stg)
               echo "environment=stg" >> $GITHUB_OUTPUT
               echo "image-tag=stg" >> $GITHUB_OUTPUT
               echo "namespace=stg" >> $GITHUB_OUTPUT
-              echo "replicas-api=2" >> $GITHUB_OUTPUT
-              echo "replicas-web=2" >> $GITHUB_OUTPUT
-              echo "replicas-worker=1" >> $GITHUB_OUTPUT
+              echo "replicas-product=2" >> $GITHUB_OUTPUT
+              echo "replicas-login=2" >> $GITHUB_OUTPUT
+              echo "replicas-order=1" >> $GITHUB_OUTPUT
               ;;
             prod)
               echo "environment=prod" >> $GITHUB_OUTPUT
               echo "image-tag=latest" >> $GITHUB_OUTPUT
               echo "namespace=default" >> $GITHUB_OUTPUT
-              echo "replicas-api=3" >> $GITHUB_OUTPUT
-              echo "replicas-web=3" >> $GITHUB_OUTPUT
-              echo "replicas-worker=2" >> $GITHUB_OUTPUT
+              echo "replicas-product=3" >> $GITHUB_OUTPUT
+              echo "replicas-login=3" >> $GITHUB_OUTPUT
+              echo "replicas-order=2" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -203,22 +203,20 @@ jobs:
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=$ROLE_ARN \
             --wait --timeout=5m
 
-      - name: Deploy API service
+      - name: Deploy Product service
         run: |
-          # Always apply the manifest first so Service/HPA spec changes
-          # (e.g. LoadBalancer -> ClusterIP) actually get synced to the cluster
-          kubectl apply -f deployments/api-deployment.yaml \
+          kubectl apply -f deployments/product-deployment.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
-          kubectl set image deployment/api \
-            api=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-api:${{ needs.determine-environment.outputs.image-tag }} \
+          kubectl set image deployment/product \
+            product=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-product:${{ needs.determine-environment.outputs.image-tag }} \
             --namespace=${{ needs.determine-environment.outputs.namespace }}
 
-      - name: Deploy Web service
+      - name: Deploy Login storefront service
         run: |
-          kubectl apply -f deployments/web-deployment.yaml \
+          kubectl apply -f deployments/login-deployment.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
-          kubectl set image deployment/web \
-            web=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-web:${{ needs.determine-environment.outputs.image-tag }} \
+          kubectl set image deployment/login \
+            login=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-login:${{ needs.determine-environment.outputs.image-tag }} \
             --namespace=${{ needs.determine-environment.outputs.namespace }}
 
       - name: Deploy Ingress
@@ -226,33 +224,33 @@ jobs:
           kubectl apply -f deployments/ingress.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
 
-      - name: Deploy Worker service
+      - name: Deploy Order service
         run: |
-          kubectl apply -f deployments/worker-deployment.yaml \
+          kubectl apply -f deployments/order-deployment.yaml \
             -n ${{ needs.determine-environment.outputs.namespace }}
-          kubectl set image deployment/worker \
-            worker=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-worker:${{ needs.determine-environment.outputs.image-tag }} \
+          kubectl set image deployment/order \
+            order=${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/lwplabs-order:${{ needs.determine-environment.outputs.image-tag }} \
             --namespace=${{ needs.determine-environment.outputs.namespace }}
 
       - name: Scale deployments
         run: |
-          kubectl scale deployment api \
-            --replicas=${{ needs.determine-environment.outputs.replicas-api }} \
+          kubectl scale deployment product \
+            --replicas=${{ needs.determine-environment.outputs.replicas-product }} \
             -n ${{ needs.determine-environment.outputs.namespace }}
-          
-          kubectl scale deployment web \
-            --replicas=${{ needs.determine-environment.outputs.replicas-web }} \
+
+          kubectl scale deployment login \
+            --replicas=${{ needs.determine-environment.outputs.replicas-login }} \
             -n ${{ needs.determine-environment.outputs.namespace }}
-          
-          kubectl scale deployment worker \
-            --replicas=${{ needs.determine-environment.outputs.replicas-worker }} \
+
+          kubectl scale deployment order \
+            --replicas=${{ needs.determine-environment.outputs.replicas-order }} \
             -n ${{ needs.determine-environment.outputs.namespace }}
 
       - name: Wait for deployments to be ready
         run: |
           echo "⏳ Waiting for deployments to be ready..."
-          
-          for deployment in api web worker; do
+
+          for deployment in product login order; do
             echo ""
             echo "Checking $deployment deployment..."
             kubectl rollout status deployment/$deployment \
@@ -265,7 +263,7 @@ jobs:
               exit 1
             }
           done
-          
+
           echo ""
           echo "✅ All deployments are ready!"
 
@@ -286,20 +284,19 @@ jobs:
       - name: Get LoadBalancer URL
         run: |
           echo "🌐 ALB Ingress LoadBalancer:"
-          
+
           INGRESS_LB=$(kubectl get ingress lwplabs-ingress \
             -n ${{ needs.determine-environment.outputs.namespace }} \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
           echo "Ingress LoadBalancer: http://$INGRESS_LB"
-          echo "Web (Host: lwplabs.example.com): http://$INGRESS_LB"
-          echo "API (Host: api.lwplabs.example.com): http://$INGRESS_LB"
-          echo "API (path /api/*, no Host header needed): http://$INGRESS_LB/api/info"
+          echo "Storefront (Host: shop.lwplabs.example.com): http://$INGRESS_LB"
+          echo "Products (Host: products.lwplabs.example.com): http://$INGRESS_LB"
+          echo "Order API (path /orders/*): http://$INGRESS_LB/orders"
 
       - name: Run smoke tests
         run: |
           echo "🧪 Running smoke tests..."
-          
-          # Wait for ALB Ingress LoadBalancer hostname
+
           for i in {1..30}; do
             INGRESS_LB=$(kubectl get ingress lwplabs-ingress \
               -n ${{ needs.determine-environment.outputs.namespace }} \
@@ -310,10 +307,10 @@ jobs:
             echo "Waiting for LoadBalancer ($i/30)..."
             sleep 2
           done
-          
+
           if [ ! -z "$INGRESS_LB" ]; then
-            echo "Testing API health endpoint via Ingress..."
-            curl -f -H "Host: api.lwplabs.example.com" http://$INGRESS_LB/health || echo "⚠️  Health check returned non-zero"
+            echo "Testing product health endpoint via Ingress..."
+            curl -f -H "Host: products.lwplabs.example.com" http://$INGRESS_LB/health || echo "⚠️  Health check returned non-zero"
             echo ""
           else
             echo "⚠️  LoadBalancer IP not yet assigned (this is normal if just deployed)"
@@ -323,31 +320,31 @@ jobs:
         run: |
           cat > /tmp/deployment-summary.txt << EOF
           ✅ Deployment Complete
-          
+
           Environment: ${{ needs.determine-environment.outputs.environment }}
           Namespace: ${{ needs.determine-environment.outputs.namespace }}
           Image Tag: ${{ needs.determine-environment.outputs.image-tag }}
-          
+
           Deployments:
-          - API: ${{ needs.determine-environment.outputs.replicas-api }} replicas
-          - Web: ${{ needs.determine-environment.outputs.replicas-web }} replicas
-          - Worker: ${{ needs.determine-environment.outputs.replicas-worker }} replicas
-          
+          - Product: ${{ needs.determine-environment.outputs.replicas-product }} replicas
+          - Login: ${{ needs.determine-environment.outputs.replicas-login }} replicas
+          - Order: ${{ needs.determine-environment.outputs.replicas-order }} replicas
+
           Commands:
           Check status:
             kubectl get all -n ${{ needs.determine-environment.outputs.namespace }}
-          
+
           View logs:
-            kubectl logs -f deployment/api -n ${{ needs.determine-environment.outputs.namespace }}
-            kubectl logs -f deployment/web -n ${{ needs.determine-environment.outputs.namespace }}
-            kubectl logs -f deployment/worker -n ${{ needs.determine-environment.outputs.namespace }}
-          
+            kubectl logs -f deployment/product -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl logs -f deployment/login -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl logs -f deployment/order -n ${{ needs.determine-environment.outputs.namespace }}
+
           Port forward:
-            kubectl port-forward -n ${{ needs.determine-environment.outputs.namespace }} svc/api 5000:5000
-            kubectl port-forward -n ${{ needs.determine-environment.outputs.namespace }} svc/web 8080:80
-          
+            kubectl port-forward -n ${{ needs.determine-environment.outputs.namespace }} svc/product 5000:5000
+            kubectl port-forward -n ${{ needs.determine-environment.outputs.namespace }} svc/login 8080:80
+
           Rollback if needed:
-            kubectl rollout undo deployment/api -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl rollout undo deployment/product -n ${{ needs.determine-environment.outputs.namespace }}
           EOF
           
           cat /tmp/deployment-summary.txt
