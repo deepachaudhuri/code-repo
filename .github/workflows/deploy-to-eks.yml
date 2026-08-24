@@ -166,12 +166,12 @@ jobs:
         run: |
           echo "🔍 Checking images in ECR..."
           
-          for service in api web worker; do
+          for service in product login order; do
             IMAGE_EXISTS=$(aws ecr describe-images \
               --repository-name lwplabs-$service \
               --image-ids imageTag=${{ needs.determine-environment.outputs.image-tag }} \
               --region ${{ env.AWS_REGION }} \
-              --query 'imageDetails[0].imageId' || echo "NOT_FOUND")
+              --query 'imageDetails[0].imageId' 2>/dev/null || echo "NOT_FOUND")
             
             if [ "$IMAGE_EXISTS" == "NOT_FOUND" ]; then
               echo "❌ Image lwplabs-$service:${{ needs.determine-environment.outputs.image-tag }} not found in ECR"
@@ -285,7 +285,9 @@ jobs:
         run: |
           echo "🌐 ALB Ingress LoadBalancer:"
 
-          INGRESS_LB=$(kubectl get ingress lwplabs-ingress \
+          INGRESS_LB=          git add .github/workflows/deploy-to-e          git add .github/workflows/deploy-to-eks.yml
+          git commit -m "fix: update ECR image verification to use product/login/order service names"
+          git pusht ingress lwplabs-ingress \
             -n ${{ needs.determine-environment.outputs.namespace }} \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
           echo "Ingress LoadBalancer: http://$INGRESS_LB"
