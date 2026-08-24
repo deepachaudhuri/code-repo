@@ -16,6 +16,11 @@ on:
       - dev
       - stg
       - master
+    paths:
+      - 'product/**'
+      - 'login/**'
+      - 'order/**'
+      - '.github/workflows/build-and-push.yml'
 
 env:
   AWS_REGION: us-east-1
@@ -67,7 +72,14 @@ jobs:
         id: git
         run: |
           echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          
+          # For PRs, use head branch; for pushes, use branch name
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          fi
+          
           echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -80,7 +92,10 @@ jobs:
           echo "name=${REPO_NAME}" >> $GITHUB_OUTPUT
 
       - name: Determine image tags
-        id: tags
+        id# Sanitize branch name for Docker tags (replace unsafe characters)
+          BRANCH_TAG=$(echo "${BRANCH}" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
+          
+          TAGS="${REGISTRY}/${REPO}:${BRANCH_TAG
         run: |
           REGISTRY="${{ steps.login-ecr.outputs.registry }}"
           REPO="${{ steps.repo.outputs.name }}"
