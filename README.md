@@ -14,8 +14,11 @@ This project demonstrates an e-commerce platform built as three microservices: p
 - [Setup Requirements](#setup-requirements) - Prerequisites & secrets
 - [Deployment Guide](#deployment-guide) - How to deploy
 - [Troubleshooting](#troubleshooting) - Common issues
+- [Kubernetes Health Checks](#kubernetes-health-checks) - Liveness & Readiness Probes
+- [Image Tags & Versioning](#image-tags--versioning) - Tag strategy
 - [AWS Architecture](#aws-architecture) - Full infrastructure
 - [Common Commands](#common-commands) - kubectl snippets
+- [Monitoring & Logs](#monitoring--logs) - View logs and metrics
 
 ---
 
@@ -309,6 +312,195 @@ module "ecr" {
   default_lifecycle_policy_days   = 7   # Delete untagged after 7 days
   default_lifecycle_policy_count  = 3   # Keep last 3 tagged versions
 }
+```
+
+[⬆ Back to Top](#-quick-navigation)
+
+---
+
+## Kubernetes Health Checks
+
+Kubernetes uses **Liveness** and **Readiness** probes to keep your applications running smoothly:
+
+### Understanding the Difference
+
+| Aspect | Readiness Probe | Liveness Probe |
+|--------|-----------------|-----------------|
+| **Purpose** | Is pod ready to accept traffic? | Is pod still alive? |
+| **When fails** | Removes from load balancer (don't restart) | Kills and restarts pod |
+| **Check timing** | Earlier/faster (pod startup) | Later/slower (stable state) |
+| **Use case** | Pod loading config/cache | Pod frozen/stuck/unresponsive |
+
+### Real-World Scenario
+
+```
+Pod Startup Timeline:
+│
+├─ T=0s      Pod starts
+│
+├─ T=5s      readinessProbe first check
+│            └─ Nginx starting up...
+│            └─ ❌ FAIL → Remove from LB (no user traffic yet)
+│
+├─ T=15s     readinessProbe success (after 2 failures)
+│            └─ Nginx ready! ✅ Add to LB (users can now reach it)
+│
+├─ T=30s     livenessProbe first check starts
+│            └─ ✅ PASS → Still responding? Good!
+│
+├─ T=60s+    Normal operation
+│            └─ readiness: Check every 10s (quick feedback)
+│            └─ liveness: Check every 30s (ensure still alive)
+│
+├─ T=120s    BAD: Application freezes (memory leak/bug)
+│            └─ readiness: ❌ FAIL → Remove from LB
+│            └─ liveness: ❌ FAIL (after 3x) → KILL & RESTART
+│            └─ Fresh pod comes up
+```
+
+### Configuration in Your Deployment
+
+**Current setup** (login-deployment.yaml):
+
+```yaml
+# READINESS PROBE: Is the pod ready to accept user traffic?
+# Used by load balancer to decide if requests should be sent to this pod
+# If fails → pod is removed from load balancer (traffic diverted to other pods)
+readinessProbe:
+  httpGet:
+    path: /                    # Simple health check - can serve static HTML?
+    port: 80
+  initialDelaySeconds: 5       # Quick check after startup (allows fast traffic routing)
+  periodSeconds: 10            # Check every 10 seconds
+  timeoutSeconds: 3
+  failureThreshold: 2          # After 2 failures (20 sec), remove from LB
+
+# LIVENESS PROBE: Is the pod still alive and responsive?
+# Used by Kubernetes to decide if pod should be restarted
+# If fails → pod is killed and restarted
+livenessProbe:
+  httpGet:
+    path: /                    # Still responding to requests?
+    port: 80
+  initialDelaySeconds: 30      # Longer delay before first check (let app stabilize)
+  periodSeconds: 30            # Check every 30 seconds (less aggressive)
+  timeoutSeconds: 5
+  failureThreshold: 3          # After 3 failures (90 sec), restart pod
+```
+
+### Advanced: Custom Health Check Endpoints
+
+For more sophisticated checks, implement custom health endpoints in your apps:
+
+**Example: Product API with health checks**
+```python
+# product/main.py
+@app.route('/health/ready', methods=['GET'])
+def readiness():
+    """Readiness probe - dependencies available?"""
+    try:
+        # Check if database is available
+        # Check if cache is ready
+        # Check if config loaded
+        return {"status": "ready"}, 200
+    except Exception as e:
+        return {"status": "not ready", "error": str(e)}, 503
+
+@app.route('/health/live', methods=['GET'])
+def liveness():
+    """Liveness probe - still running?"""
+    try:
+        # Just check if app is responding
+        # Don't check external dependencies
+        return {"status": "alive"}, 200
+    except Exception as e:
+        return {"status": "dead", "error": str(e)}, 500
+```
+
+Then update deployment:
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health/ready      # More thorough check
+    port: 5000
+  initialDelaySeconds: 5
+
+livenessProbe:
+  httpGet:
+    path: /health/live       # Quick check
+    port: 5000
+  initialDelaySeconds: 30
+```
+
+### Monitoring Probe Results
+
+```bash
+# View probe events
+kubectl describe pod <pod-name> -n default
+
+# Output will show:
+# Ready     True
+# ContainersReady   True
+# PodScheduled      True
+# Events:
+#   Type    Reason     Age   Message
+#   ----    ------     ---   -------
+#   Normal  Started    2m    Started container
+#   Warning Unhealthy  1m    Readiness probe failed
+#   Normal  Pulled     30s   Container image pulled
+
+# View pod status
+kubectl get pods -n default -o wide
+
+# Watch pod restarts
+kubectl get pods -n default --watch
+```
+
+### Common Probe Mistakes to Avoid
+
+❌ **Mistake 1:** Making readiness probe too strict
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 5000
+  failureThreshold: 1      # ❌ Removes immediately if any check fails
+  periodSeconds: 5         # Too frequent - can cause flapping
+```
+✅ **Fix:** Allow some failures during startup
+```yaml
+failureThreshold: 2        # Allow 2 failures (20 sec with 10s interval)
+periodSeconds: 10          # Check every 10 seconds
+```
+
+❌ **Mistake 2:** Checking external dependencies in liveness
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/database-check   # ❌ Checks DB connection
+    port: 5000
+```
+✅ **Fix:** Liveness should just check if app is running
+```yaml
+livenessProbe:
+  httpGet:
+    path: /                        # Simple check - app responding?
+    port: 5000
+```
+
+❌ **Mistake 3:** Same timeout for both probes
+```yaml
+readinessProbe:
+  timeoutSeconds: 1        # ❌ Too short - network latency
+livenessProbe:
+  timeoutSeconds: 1        # ❌ Too short
+```
+✅ **Fix:** Give liveness longer timeout (checking for hangs)
+```yaml
+readinessProbe:
+  timeoutSeconds: 3        # Quick (startup phase)
+livenessProbe:
+  timeoutSeconds: 5        # Longer (checking for freezes)
 ```
 
 [⬆ Back to Top](#-quick-navigation)
