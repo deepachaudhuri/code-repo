@@ -1,10 +1,7 @@
 name: Deploy to EKS
 
 on:
-  workflow_run:
-    workflows: ["Build and Push to ECR"]
-    types:
-      - completed
+  push:
     branches:
       - master
   workflow_dispatch:
@@ -18,24 +15,9 @@ env:
   REPLICAS: 3
 
 jobs:
-  check-build-status:
-    name: Check Build Status
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run'
-    steps:
-      - name: Check if build succeeded
-        run: |
-          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-            echo "❌ Build workflow failed. Skipping deployment."
-            exit 1
-          fi
-          echo "✅ Build workflow succeeded. Proceeding with deployment."
-
   deploy-to-eks:
     name: Deploy to EKS
     runs-on: ubuntu-latest
-    needs: check-build-status
-    if: always() && (needs.check-build-status.result == 'success' || github.event_name == 'workflow_dispatch')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
