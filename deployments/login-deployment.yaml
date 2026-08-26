@@ -20,7 +20,7 @@ spec:
       - name: ecr-secret
       containers:
       - name: login
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-login:dev  # Change tag: dev -> stg -> latest
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-login:latest  # Change tag: dev -> stg -> latest
         ports:
         - containerPort: 80
           name: http
@@ -28,7 +28,7 @@ spec:
 
         env:
         - name: ENVIRONMENT
-          value: "development"
+          value: "production"
         - name: VERSION
           value: "1.0.0"
 
@@ -40,23 +40,33 @@ spec:
             cpu: "500m"
             memory: "256Mi"
 
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 30
-          timeoutSeconds: 3
-          failureThreshold: 3
-
+        # READINESS PROBE: Is the pod ready to accept user traffic?
+        # Used by load balancer to decide if requests should be sent to this pod
+        # If fails → pod is removed from load balancer (traffic diverted to other pods)
+        # Status: Pod still running, just temporarily unavailable
         readinessProbe:
           httpGet:
-            path: /
+            path: /                    # Simple health check - can serve static HTML?
             port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 5       # Quick check after startup (allows fast traffic routing)
+          periodSeconds: 10            # Check every 10 seconds
           timeoutSeconds: 3
-          failureThreshold: 2
+          failureThreshold: 2          # After 2 failures (20 sec), remove from LB
+          # Use case: App is loading config/cache, not ready yet but will recover
+
+        # LIVENESS PROBE: Is the pod still alive and responsive?
+        # Used by Kubernetes to decide if pod should be restarted
+        # If fails → pod is killed and restarted
+        # Status: Pod might be stuck/frozen and needs a restart
+        livenessProbe:
+          httpGet:
+            path: /                    # Still responding to requests?
+            port: 80
+          initialDelaySeconds: 30      # Longer delay before first check (let app stabilize)
+          periodSeconds: 30            # Check every 30 seconds (less aggressive)
+          timeoutSeconds: 5            # Allow 5 seconds for response
+          failureThreshold: 3          # After 3 failures (90 sec), restart pod
+          # Use case: App is completely unresponsive/frozen - needs restart
 
       restartPolicy: Always
 
