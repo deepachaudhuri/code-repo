@@ -20,7 +20,8 @@ spec:
       - name: ecr-secret
       containers:
       - name: order
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-order:dev  # Change tag: dev -> stg -> latest
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-order:latest
+        imagePullPolicy: Always
 
         env:
         - name: ENVIRONMENT

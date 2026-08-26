@@ -20,7 +20,8 @@ spec:
       - name: ecr-secret
       containers:
       - name: product
-        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:dev  # Change tag: dev -> stg -> latest
+        image: 447733314827.dkr.ecr.us-east-1.amazonaws.com/lwplabs-product:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
           name: http
